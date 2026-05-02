@@ -70,19 +70,31 @@
             font-size: 1.1rem; font-weight: bold; border-radius: 8px; cursor: pointer;
             transition: all 0.2s ease; text-transform: uppercase; margin: 5px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-            min-height: 44px; /* Touch-friendly size */
-            touch-action: manipulation;
+            min-height: 44px; touch-action: manipulation;
+            position: relative; overflow: hidden;
         }
         button:hover { background: #27ae60; transform: translateY(-2px); }
         button:active { transform: translateY(1px); }
         button.secondary { background: var(--dark); border: 1px solid rgba(255,255,255,0.2); }
         button.secondary:hover { background: #34495e; }
 
+        /* Difficulty Selector */
+        .diff-selector {
+            display: flex; justify-content: center; gap: 5px; margin-bottom: 15px;
+            background: rgba(0,0,0,0.3); padding: 5px; border-radius: 10px;
+        }
+        .diff-btn {
+            background: transparent; color: #bdc3c7; border: 2px solid transparent; font-size: 0.9rem;
+            padding: 8px 15px; border-radius: 6px; box-shadow: none; text-transform: none; margin: 0;
+        }
+        .diff-btn.selected { background: rgba(255,255,255,0.1); color: white; border-color: var(--primary); font-weight: bold; }
+        .diff-btn:hover:not(.selected) { background: rgba(255,255,255,0.05); transform: none; }
+
         /* Level Selector */
         .level-selector {
             display: flex; align-items: center; justify-content: center; gap: 15px;
             margin: 15px 0; background: rgba(0,0,0,0.3); padding: 10px; border-radius: 10px;
-            width: 100%;
+            width: 100%; border: 1px solid rgba(255,255,255,0.05);
         }
         .level-btn { background: none; border: none; font-size: 1.5rem; padding: 5px 15px; box-shadow: none; color: var(--light); }
         .level-btn:hover { background: rgba(255,255,255,0.1); transform: none; }
@@ -102,7 +114,7 @@
             display: flex; flex-direction: column; align-items: center;
         }
         .char-card.locked { filter: grayscale(100%); opacity: 0.5; cursor: not-allowed; }
-        .char-card.selected { border-color: var(--primary); background: rgba(46,204,113,0.1); box-shadow: 0 0 15px rgba(46,204,113,0.3); }
+        .char-card.selected { border-color: var(--primary); background: rgba(46,204,113,0.1); box-shadow: 0 0 15px rgba(46,204,113,0.3); transform: scale(1.05); }
         .char-icon-preview { width: 40px; height: 40px; margin-bottom: 5px; }
         .char-name { font-weight: bold; font-size: 0.75rem; text-align: center; }
         .char-req { font-size: 0.65rem; color: var(--accent); }
@@ -152,18 +164,17 @@
         #orientation-warning .phone-icon { font-size: 4rem; margin-bottom: 20px; animation: rotatePhone 2s infinite ease-in-out; }
         @keyframes rotatePhone { 0% { transform: rotate(-90deg); } 50% { transform: rotate(0deg); } 100% { transform: rotate(-90deg); } }
 
-        /* Mobile Landscape Detection */
         @media (max-width: 900px) and (max-height: 500px) and (orientation: landscape) {
             #orientation-warning { display: flex; }
             .screen { max-height: 90vh; padding: 15px; } 
-            #character-grid { grid-template-columns: repeat(4, 1fr); max-height: 40vh; overflow-y: auto; }
+            #character-grid { grid-template-columns: repeat(4, 1fr); max-height: 35vh; overflow-y: auto; }
         }
 
         /* Leaderboard & Stats Lists */
         .list-container { width: 100%; text-align: left; background: rgba(0,0,0,0.3); border-radius: 8px; padding: 10px; margin-bottom: 15px;}
         .list-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.1); }
         .list-item:last-child { border: none; }
-        .challenge-box { background: rgba(241, 196, 15, 0.1); border: 1px solid var(--gold); padding: 10px; border-radius: 8px; margin-bottom: 15px; }
+        .challenge-box { background: rgba(241, 196, 15, 0.1); border: 1px solid var(--gold); padding: 10px; border-radius: 8px; margin-bottom: 10px; }
 
         @media (max-width: 700px) {
             #character-grid { grid-template-columns: repeat(3, 1fr); }
@@ -184,7 +195,6 @@
     </div>
 
     <div id="ui-layer">
-        <!-- Orientation Warning Overlay -->
         <div id="orientation-warning">
             <div class="phone-icon">📱</div>
             <h2>Rotate Device</h2>
@@ -194,7 +204,8 @@
         <!-- HUD -->
         <div id="hud">
             <div class="hud-box"><span class="hud-label">Score</span><span id="hudScore">0</span></div>
-            <div class="hud-box"><span class="hud-label">Level</span><span id="hudLevel">0</span></div>
+            <div class="hud-box"><span class="hud-label" id="hudLevelLabel">Level</span><span id="hudLevel">0</span></div>
+            <div class="hud-box"><span class="hud-label">Diff</span><span id="hudDiff">Med</span></div>
         </div>
         
         <div id="center-msg"></div>
@@ -212,6 +223,13 @@
         <!-- Main Menu -->
         <div id="startScreen" class="screen">
             <h1>Flappy Heroes</h1>
+            
+            <div class="diff-selector" id="diffSelector">
+                <button class="diff-btn" data-diff="easy">Easy</button>
+                <button class="diff-btn selected" data-diff="medium">Medium</button>
+                <button class="diff-btn" data-diff="hard">Hard</button>
+            </div>
+
             <div class="challenge-box">
                 <div style="color:var(--gold); font-size:0.8rem; font-weight:bold;">DAILY DIRECTIVE</div>
                 <div id="challengeDesc">Clear 15 obstacles with Thor</div>
@@ -242,7 +260,7 @@
         <div id="gameOverScreen" class="screen">
             <h1 style="color: var(--accent);">Mission Failed</h1>
             <h2>Score: <span id="endScore">0</span></h2>
-            <p>Checkpoint: <span id="endLevelName">City</span></p>
+            <p>Reached: <span id="endLevelName">City</span></p>
             <p style="font-size: 0.9rem; color: var(--gold);" id="newRecordMsg"></p>
             <div style="display:flex; flex-wrap:wrap; justify-content:center;">
                 <button id="restartBtn">Try Again</button>
@@ -275,7 +293,7 @@
                 <div class="list-item"><span>Operative Name:</span><strong id="statName">Unknown</strong></div>
                 <div class="list-item"><span>Total Missions:</span><strong id="statRuns">0</strong></div>
                 <div class="list-item"><span>Total Score:</span><strong id="statTotalScore">0</strong></div>
-                <div class="list-item"><span>Highest Level Reached:</span><strong id="statMaxLevel">0</strong></div>
+                <div class="list-item"><span>Max Difficulty Reached:</span><strong id="statMaxLevel">0</strong></div>
                 <div class="list-item"><span>Most Used Hero:</span><strong id="statFavHero">Orb</strong></div>
             </div>
             <button class="closeModalBtn secondary">Close</button>
@@ -283,22 +301,27 @@
     </div>
 
     <script>
-        // --- CONFIGURATION --- //
+        // --- CONFIGURATION & SETTINGS --- //
         const CANVAS_WIDTH = 800; const CANVAS_HEIGHT = 600;
-        const GRAVITY = 0.5; const JUMP_STRENGTH = -8.5;
-        const OBSTACLE_SPEED = 4; const OBSTACLE_WIDTH = 70; const OBSTACLE_GAP = 200;
-        const SPAWN_RATE = 90; const LEVEL_THRESHOLD = 10; const MAX_LEVEL = 9;
+        const OBSTACLE_SPEED = 4; const OBSTACLE_WIDTH = 70;
+        const SPAWN_RATE = 90; const MAX_THEME_LEVEL = 11;
+
+        // Difficulty Presets
+        const DIFFICULTIES = {
+            easy: { grav: 0.35, jump: -7.0, gap: 280, label: 'Easy' },
+            medium: { grav: 0.5, jump: -8.5, gap: 200, label: 'Med' },
+            hard: { grav: 0.7, jump: -10.5, gap: 140, label: 'Hard' }
+        };
+        let currentDiff = 'medium';
 
         // Expanded Character Definitions (16 Total)
         const CHARACTERS = [
-            // Original Marvel-inspired
             { id: 0, name: 'Core Orb', req: 0, color: '#ecf0f1', detail: '#bdc3c7', tag: 'The standard energy unit.', type: 'orb' },
             { id: 1, name: 'Iron Mask', req: 10, color: '#f1c40f', detail: '#c0392b', tag: 'Tech genius in the sky.', type: 'iron' },
             { id: 2, name: 'Hulk Fist', req: 30, color: '#2ecc71', detail: '#27ae60', tag: 'Smash through the atmosphere.', type: 'hulk' },
             { id: 3, name: 'Cap Shield', req: 50, color: '#e74c3c', detail: '#2980b9', tag: 'The star-spangled frisbee.', type: 'cap' },
             { id: 4, name: 'Mjölnir', req: 70, color: '#95a5a6', detail: '#7f8c8d', tag: 'Whosoever holds this hammer...', type: 'thor' },
             { id: 5, name: 'Spider Mask', req: 90, color: '#c0392b', detail: '#000', tag: 'Friendly neighborhood flier.', type: 'spider' },
-            // New Multi-genre Heroes
             { id: 6, name: 'Hidden Leaf', req: 110, color: '#bdc3c7', detail: '#2c3e50', tag: 'Believe it!', type: 'leaf' },
             { id: 7, name: 'Z-Warrior', req: 130, color: '#e67e22', detail: '#f1c40f', tag: 'Power levels rising!', type: 'ki' },
             { id: 8, name: 'Street Surfer', req: 150, color: '#e74c3c', detail: '#8e44ad', tag: 'Keep running.', type: 'spray' },
@@ -311,7 +334,7 @@
             { id: 15, name: 'Dragon Soul', req: 300, color: '#e67e22', detail: '#c0392b', tag: 'Fire and blood.', type: 'dragon' }
         ];
 
-        // Level Themes & Parallax Layer Definitions
+        // 12 Level Themes (0-11)
         const THEMES = [
             { id: 0, name: 'Day City', bgTop: '#87CEEB', bgBot: '#e0f6ff', pipeMain: '#aab7b8', pipeEdge: '#95a5a6', env: 'cityDay' },
             { id: 1, name: 'Night City', bgTop: '#0B0B2A', bgBot: '#1a1a4a', pipeMain: '#2c3e50', pipeEdge: '#e74c3c', env: 'cityNight' },
@@ -322,7 +345,9 @@
             { id: 6, name: 'Underwater', bgTop: '#03045e', bgBot: '#0077b6', pipeMain: '#023e8a', pipeEdge: '#48cae4', env: 'water' },
             { id: 7, name: 'Sky Realm', bgTop: '#c8b6ff', bgBot: '#ffc8dd', pipeMain: '#fdfcdc', pipeEdge: '#f1c40f', env: 'clouds' },
             { id: 8, name: 'Cyberpunk', bgTop: '#240046', bgBot: '#10002b', pipeMain: 'rgba(224, 170, 255, 0.3)', pipeEdge: '#00ffff', env: 'cyber' },
-            { id: 9, name: 'Galaxy', bgTop: '#000000', bgBot: '#14213d', pipeMain: '#2b2d42', pipeEdge: '#8d99ae', env: 'space' }
+            { id: 9, name: 'Galaxy', bgTop: '#000000', bgBot: '#14213d', pipeMain: '#2b2d42', pipeEdge: '#8d99ae', env: 'space' },
+            { id: 10, name: 'Dino World', bgTop: '#2d3436', bgBot: '#873600', pipeMain: '#d35400', pipeEdge: '#e67e22', env: 'dino' },
+            { id: 11, name: 'Infinity', bgTop: '#000000', bgBot: '#2c003e', pipeMain: '#ff00ff', pipeEdge: '#00ffff', env: 'infinity' }
         ];
 
         // Challenge Types
@@ -337,19 +362,21 @@
         let canvas, ctx, spotlightCanvas, spotlightCtx;
         let scaleRatio = 1; let frames = 0; let globalScore = 0; let runScore = 0;
         let currentLevel = 0; let selectedStartLevel = 0;
-        let currentState = 'NAME'; // NAME, START, PLAYING, GAMEOVER, UNLOCK
+        let currentState = 'NAME'; // NAME, START, PLAYING, DYING, GAMEOVER, UNLOCK
         let selectedCharacterId = 0;
         let screenPulseAlpha = 0;
+        let screenShake = 0;
+        let deathTimer = 0;
         
         let player; let obstacles = []; let floatingTexts = []; let particles = []; let bgLayers = [];
         let recentlyUnlockedHeroes = [];
 
-        // Player Profile & Storage
+        // Player Profile & Storage (Refactored for per-difficulty tracking)
         let profile = {
             name: "",
-            highScore: 0,
-            levelHighScores: {}, // { levelId: score }
-            unlockedLevels: [0],
+            highScores: { easy: 0, medium: 0, hard: 0 },
+            levelHighScores: { easy: {}, medium: {}, hard: {} }, // { levelId: score }
+            unlockedLevels: { easy: [0], medium: [0], hard: [0] },
             heroPlays: {}, // { heroId: count }
             totalRuns: 0,
             totalScore: 0,
@@ -359,9 +386,7 @@
 
         // --- PERFORMANCE / DEVICE TRACKING --- //
         let isLowPerf = false;
-        function checkPerformance() {
-            isLowPerf = window.innerWidth <= 600 || window.innerHeight <= 600;
-        }
+        function checkPerformance() { isLowPerf = window.innerWidth <= 600 || window.innerHeight <= 600; }
 
         // --- AUDIO SYSTEM --- //
         let audioCtx, soundEnabled = true;
@@ -389,9 +414,9 @@
                     gain.gain.setValueAtTime(0.05, now); gain.gain.linearRampToValueAtTime(0, now + 0.1);
                     osc.start(now); osc.stop(now + 0.1); break;
                 case 'crash':
-                    osc.type = 'sawtooth'; osc.frequency.setValueAtTime(150, now); osc.frequency.exponentialRampToValueAtTime(20, now + 0.3);
-                    gain.gain.setValueAtTime(0.2, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
-                    osc.start(now); osc.stop(now + 0.3); break;
+                    osc.type = 'sawtooth'; osc.frequency.setValueAtTime(150, now); osc.frequency.exponentialRampToValueAtTime(20, now + 0.4);
+                    gain.gain.setValueAtTime(0.3, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+                    osc.start(now); osc.stop(now + 0.4); break;
                 case 'milestone':
                     [523.25, 659.25, 783.99, 1046.50].forEach((freq, i) => { // C Major chord arpeggio
                         const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
@@ -406,9 +431,23 @@
 
         // --- STORAGE & LOGIC --- //
         function loadData() {
-            const stored = localStorage.getItem('fh_multiverse_profile');
+            const stored = localStorage.getItem('fh_multiverse_profile_v2');
             if (stored) {
                 try { profile = {...profile, ...JSON.parse(stored)}; } catch(e){}
+            } else {
+                // Migration from v1
+                const oldStored = localStorage.getItem('fh_multiverse_profile');
+                if (oldStored) {
+                    try { 
+                        let old = JSON.parse(oldStored);
+                        profile.name = old.name || "";
+                        profile.highScores.medium = old.highScore || 0;
+                        profile.unlockedLevels.medium = old.unlockedLevels || [0];
+                        profile.totalRuns = old.totalRuns || 0;
+                        profile.totalScore = old.totalScore || 0;
+                        profile.heroPlays = old.heroPlays || {};
+                    } catch(e){}
+                }
             }
             const lb = localStorage.getItem('fh_multiverse_leaderboard');
             if (lb) leaderboard = JSON.parse(lb);
@@ -420,15 +459,24 @@
             }
         }
         function saveData() {
-            localStorage.setItem('fh_multiverse_profile', JSON.stringify(profile));
+            localStorage.setItem('fh_multiverse_profile_v2', JSON.stringify(profile));
             localStorage.setItem('fh_multiverse_leaderboard', JSON.stringify(leaderboard));
         }
 
         function updateLeaderboard(score, level) {
-            leaderboard.push({ name: profile.name, score: score, level: level, hero: CHARACTERS[selectedCharacterId].name });
+            leaderboard.push({ name: profile.name, score: score, level: level, hero: CHARACTERS[selectedCharacterId].name, diff: currentDiff });
             leaderboard.sort((a,b) => b.score - a.score);
-            leaderboard = leaderboard.slice(0, 5); // Keep top 5
+            leaderboard = leaderboard.slice(0, 5);
             saveData();
+        }
+
+        function getThemeForLevel(lvl) {
+            return THEMES[Math.min(lvl, MAX_THEME_LEVEL)] || THEMES[0];
+        }
+
+        function getStartScoreForLevel(lvl) {
+            if (lvl <= MAX_THEME_LEVEL) return lvl * 10;
+            return 110 + (lvl - 11) * 20; // 20 per checkpoint after 11
         }
 
         // --- CLASSES --- //
@@ -446,10 +494,18 @@
                         this.layers.push(new Layer(1, 'vines', '#27ae60', 0.4));
                         this.layers.push(new Layer(2, 'trees', '#1e8449', 0.8));
                         break;
+                    case 'dino':
+                        this.layers.push(new Layer(1, 'volcanoes', '#873600', 0.3));
+                        this.layers.push(new Layer(2, 'ferns', '#2d3436', 0.8));
+                        break;
                     case 'space':
                         this.layers.push(new Layer(1, 'stars-small', '#ffffff', 0.1));
                         this.layers.push(new Layer(2, 'stars-big', '#f1c40f', 0.3));
                         this.layers.push(new Layer(3, 'asteroids', '#555', 0.6));
+                        break;
+                    case 'infinity':
+                        this.layers.push(new Layer(1, 'warp-slow', '#ff00ff', 0.5));
+                        this.layers.push(new Layer(2, 'warp-fast', '#00ffff', 1.2));
                         break;
                     default:
                         this.layers.push(new Layer(1, 'hills', theme.pipeEdge, 0.4));
@@ -457,37 +513,42 @@
                         break;
                 }
             }
-            update() { this.layers.forEach(l => l.update()); }
+            update(timeScale = 1.0) { this.layers.forEach(l => l.update(timeScale)); }
             draw(ctx) { this.layers.forEach(l => l.draw(ctx)); }
         }
 
         class Layer {
             constructor(depth, type, color, speedScale) {
                 this.depth = depth; this.type = type; this.color = color;
-                this.speed = speedScale * OBSTACLE_SPEED * 0.5;
+                this.baseSpeed = speedScale * OBSTACLE_SPEED * 0.5;
                 this.offsetX = 0;
                 this.elements = this.generateElements();
             }
             generateElements() {
                 let els = [];
-                let countMultiplier = isLowPerf ? 0.5 : 1; // Graceful downgrade for smaller devices
+                let countMultiplier = isLowPerf ? 0.5 : 1; 
                 if (this.type.includes('buildings')) {
                     for(let i=0; i<15 * countMultiplier; i++) els.push({ x: i*80, w: 60+Math.random()*40, h: 100+Math.random()*200 });
-                } else if (this.type === 'trees') {
+                } else if (this.type === 'trees' || this.type === 'ferns') {
                     for(let i=0; i<10 * countMultiplier; i++) els.push({ x: i*100, r: 80+Math.random()*40, h: 200+Math.random()*50 });
+                } else if (this.type === 'volcanoes') {
+                    for(let i=0; i<5 * countMultiplier; i++) els.push({ x: i*300, r: 150+Math.random()*100, h: 100+Math.random()*150 });
                 } else if (this.type.includes('stars')) {
                     for(let i=0; i<50 * countMultiplier; i++) els.push({ x: Math.random()*CANVAS_WIDTH*2, y: Math.random()*CANVAS_HEIGHT, r: this.type === 'stars-big' ? 2 : 1 });
+                } else if (this.type.includes('warp')) {
+                    for(let i=0; i<30 * countMultiplier; i++) els.push({ x: Math.random()*CANVAS_WIDTH*2, y: Math.random()*CANVAS_HEIGHT, l: 20+Math.random()*50 });
                 } else if (this.type === 'hills') {
                     for(let i=0; i<5 * countMultiplier; i++) els.push({ x: i*300, r: 200+Math.random()*100 });
                 }
                 return els;
             }
-            update() {
-                this.offsetX += this.speed;
+            update(timeScale) {
+                this.offsetX += this.baseSpeed * timeScale;
                 if (this.offsetX > CANVAS_WIDTH) this.offsetX -= CANVAS_WIDTH;
             }
             draw(ctx) {
                 ctx.fillStyle = this.color;
+                ctx.strokeStyle = this.color; ctx.lineWidth = 2;
                 ctx.beginPath();
                 this.elements.forEach(e => {
                     let drawX = e.x - this.offsetX;
@@ -497,16 +558,20 @@
                         
                         if (this.type.includes('buildings')) {
                             ctx.rect(currentX, CANVAS_HEIGHT - e.h, e.w, e.h);
-                        } else if (this.type === 'trees') {
+                        } else if (this.type === 'trees' || this.type === 'ferns') {
                             ctx.moveTo(currentX, CANVAS_HEIGHT); ctx.lineTo(currentX+e.r/2, CANVAS_HEIGHT-e.h); ctx.lineTo(currentX+e.r, CANVAS_HEIGHT);
+                        } else if (this.type === 'volcanoes') {
+                            ctx.moveTo(currentX-e.r, CANVAS_HEIGHT); ctx.lineTo(currentX, CANVAS_HEIGHT-e.h); ctx.lineTo(currentX+e.r, CANVAS_HEIGHT);
                         } else if (this.type.includes('stars')) {
                             ctx.rect(currentX, e.y, e.r, e.r);
+                        } else if (this.type.includes('warp')) {
+                            ctx.moveTo(currentX, e.y); ctx.lineTo(currentX+e.l, e.y);
                         } else if (this.type === 'hills') {
                             ctx.arc(currentX, CANVAS_HEIGHT, e.r, Math.PI, 0);
                         }
                     }
                 });
-                ctx.fill();
+                if(this.type.includes('warp')) ctx.stroke(); else ctx.fill();
             }
         }
 
@@ -514,21 +579,22 @@
             constructor() {
                 this.x = CANVAS_WIDTH / 3; this.y = CANVAS_HEIGHT / 2;
                 this.vy = 0; this.radius = 18; this.rotation = 0;
+                this.fragments = [];
+                this.isDead = false;
             }
             jump() {
-                this.vy = JUMP_STRENGTH; playSound('jump');
+                this.vy = DIFFICULTIES[currentDiff].jump; 
+                playSound('jump');
                 this.spawnParticles();
             }
             spawnParticles() {
-                const char = CHARACTERS[selectedCharacterId] || CHARACTERS[0];
+                const char = CHARACTERS.find(c=>c.id === selectedCharacterId) || CHARACTERS[0];
                 let pType = 'trail'; let color = char.color;
                 
                 if(char.type === 'iron') color = '#00ffff';
                 if(char.type === 'hulk') color = '#2ecc71';
                 if(char.type === 'cap') color = ['#e74c3c','#ffffff','#2980b9'][Math.floor(Math.random()*3)];
                 if(char.type === 'thor') color = ['#00ffff', '#ffffff'][Math.floor(Math.random()*2)];
-                
-                // New Hero Particles
                 if(char.type === 'leaf') { pType = 'wind'; color = 'rgba(200,255,255,0.7)'; }
                 if(char.type === 'ki') { pType = 'trail'; color = '#f1c40f'; }
                 if(char.type === 'spray') { pType = 'trail'; color = ['#ff00ff', '#00ffff'][Math.floor(Math.random()*2)]; }
@@ -543,30 +609,74 @@
                 let particleCount = isLowPerf ? 2 : 4;
                 for(let i=0; i<particleCount; i++){ particles.push(new Particle(this.x, this.y, pType, color)); }
             }
-            update() {
-                this.vy += GRAVITY; this.y += this.vy;
+            explode() {
+                this.isDead = true;
+                const char = CHARACTERS.find(c=>c.id === selectedCharacterId) || CHARACTERS[0];
+                for(let i=0; i<10; i++) {
+                    this.fragments.push({
+                        x: this.x + (Math.random()-0.5)*this.radius,
+                        y: this.y + (Math.random()-0.5)*this.radius,
+                        vx: (Math.random()-0.5)*15 - 2, // slightly pushed back
+                        vy: (Math.random()-0.5)*15 - 5,
+                        rot: Math.random()*Math.PI*2,
+                        vRot: (Math.random()-0.5)*0.5,
+                        color: Math.random() > 0.5 ? char.color : (char.detail || '#fff'),
+                        size: Math.random()*this.radius*0.8 + 2
+                    });
+                }
+            }
+            update(timeScale) {
+                if (this.isDead) {
+                    this.fragments.forEach(f => {
+                        f.vy += DIFFICULTIES[currentDiff].grav * timeScale;
+                        f.x += f.vx * timeScale;
+                        f.y += f.vy * timeScale;
+                        f.rot += f.vRot * timeScale;
+                    });
+                    return;
+                }
+
+                this.vy += DIFFICULTIES[currentDiff].grav * timeScale; 
+                this.y += this.vy * timeScale;
                 this.rotation = Math.min(Math.PI / 4, Math.max(-Math.PI / 4, (this.vy * 0.1)));
-                if (this.y + this.radius >= CANVAS_HEIGHT || this.y - this.radius <= 0) gameOver();
-                if(frames % 5 === 0) this.spawnParticles();
+                
+                if (this.y + this.radius >= CANVAS_HEIGHT || this.y - this.radius <= 0) triggerDeath();
+                if(frames % 5 === 0 && timeScale > 0.5) this.spawnParticles();
             }
             draw(ctx, isStatic = false) {
+                if (this.isDead) {
+                    this.fragments.forEach(f => {
+                        ctx.save(); ctx.translate(f.x, f.y); ctx.rotate(f.rot);
+                        ctx.fillStyle = f.color;
+                        ctx.beginPath(); ctx.moveTo(0, -f.size); ctx.lineTo(f.size, f.size); ctx.lineTo(-f.size, f.size); ctx.fill();
+                        ctx.restore();
+                    });
+                    return;
+                }
+
                 const char = CHARACTERS.find(c => c.id === selectedCharacterId) || CHARACTERS[0];
-                const r = this.radius; // Scaler for proportional drawing
+                const r = this.radius;
                 
                 ctx.save();
                 ctx.translate(this.x, this.y);
                 if(!isStatic) ctx.rotate(this.rotation);
 
+                // Improved Icon Drawing with gradients/glows
+                let grad;
                 switch(char.type) {
                     case 'orb':
-                        ctx.fillStyle = char.color; ctx.shadowColor = char.color; ctx.shadowBlur = r;
+                        grad = ctx.createRadialGradient(0,-r*0.2,r*0.1, 0,0,r);
+                        grad.addColorStop(0, '#fff'); grad.addColorStop(1, char.color);
+                        ctx.fillStyle = grad; ctx.shadowColor = char.color; ctx.shadowBlur = r;
                         ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 0;
                         break;
                     case 'iron':
-                        ctx.fillStyle = char.color; ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
+                        grad = ctx.createRadialGradient(0,0,r*0.2, 0,0,r);
+                        grad.addColorStop(0, '#f1c40f'); grad.addColorStop(1, '#e67e22');
+                        ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
                         ctx.fillStyle = char.detail;
                         ctx.fillRect(-r, -r*0.8, r*2, r*0.4); ctx.fillRect(-r*0.8, 0, r*0.5, r*0.8);
-                        ctx.fillStyle = '#00ffff'; ctx.shadowColor = '#00ffff'; ctx.shadowBlur = r*0.5;
+                        ctx.fillStyle = '#00ffff'; ctx.shadowColor = '#00ffff'; ctx.shadowBlur = r*0.8;
                         ctx.beginPath(); ctx.arc(r*0.25, 0, r*0.25, 0, Math.PI*2); ctx.fill(); ctx.shadowBlur = 0;
                         break;
                     case 'hulk':
@@ -583,11 +693,15 @@
                         break;
                     case 'thor':
                         ctx.fillStyle = char.detail; ctx.fillRect(-r*0.8, -r*0.5, r*1.6, r);
-                        ctx.fillStyle = '#8B4513'; ctx.fillRect(-r*0.2, r*0.5, r*0.4, r*0.8);
+                        grad = ctx.createLinearGradient(-r*0.2, r*0.5, r*0.2, r*1.3);
+                        grad.addColorStop(0, '#8B4513'); grad.addColorStop(1, '#5c2a08');
+                        ctx.fillStyle = grad; ctx.fillRect(-r*0.2, r*0.5, r*0.4, r*0.8);
                         ctx.strokeStyle = '#bdc3c7'; ctx.lineWidth = r*0.1; ctx.strokeRect(-r*0.75, -r*0.45, r*1.5, r*0.9);
                         break;
                     case 'spider':
-                        ctx.fillStyle = char.color; ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI*2); ctx.fill();
+                        grad = ctx.createRadialGradient(0,0,0, 0,0,r);
+                        grad.addColorStop(0, '#e74c3c'); grad.addColorStop(1, '#c0392b');
+                        ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI*2); ctx.fill();
                         ctx.strokeStyle = '#000'; ctx.lineWidth = Math.max(1, r*0.05);
                         ctx.beginPath(); ctx.moveTo(-r, 0); ctx.lineTo(r, 0); ctx.stroke();
                         ctx.beginPath(); ctx.moveTo(0, -r); ctx.lineTo(0, r); ctx.stroke();
@@ -604,21 +718,21 @@
                         ctx.beginPath(); ctx.moveTo(0, r*0.25); ctx.lineTo(r*0.3, r*0.25); ctx.stroke();
                         break;
                     case 'ki':
-                        let radGrad = ctx.createRadialGradient(0,0,r*0.2, 0,0,r);
-                        radGrad.addColorStop(0, '#fff'); radGrad.addColorStop(0.3, char.color); radGrad.addColorStop(1, 'rgba(230, 126, 34, 0)');
-                        ctx.fillStyle = radGrad; ctx.beginPath(); ctx.arc(0,0,r,0,Math.PI*2); ctx.fill();
+                        grad = ctx.createRadialGradient(0,0,r*0.2, 0,0,r);
+                        grad.addColorStop(0, '#fff'); grad.addColorStop(0.3, char.color); grad.addColorStop(1, 'rgba(230, 126, 34, 0)');
+                        ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(0,0,r,0,Math.PI*2); ctx.fill();
                         break;
                     case 'spray':
                         ctx.fillStyle = char.color; ctx.fillRect(-r*0.6, -r, r*1.2, r*2);
-                        ctx.fillStyle = char.detail; ctx.fillRect(-r*0.3, -r*1.2, r*0.6, r*0.2); // cap
-                        ctx.fillStyle = '#bdc3c7'; ctx.fillRect(r*0.3, -r*1.1, r*0.2, r*0.1); // nozzle
+                        ctx.fillStyle = char.detail; ctx.fillRect(-r*0.3, -r*1.2, r*0.6, r*0.2);
+                        ctx.fillStyle = '#bdc3c7'; ctx.fillRect(r*0.3, -r*1.1, r*0.2, r*0.1);
                         break;
                     case 'bird':
                         ctx.fillStyle = char.color; ctx.beginPath(); ctx.arc(0,0,r,0,Math.PI*2); ctx.fill();
                         ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(-r*0.3, -r*0.2, r*0.3, 0, Math.PI*2); ctx.fill();
                         ctx.beginPath(); ctx.arc(r*0.3, -r*0.2, r*0.3, 0, Math.PI*2); ctx.fill();
-                        ctx.fillStyle = '#000'; ctx.fillRect(-r*0.6, -r*0.6, r*0.6, r*0.2); ctx.fillRect(0, -r*0.6, r*0.6, r*0.2); // Angry brows
-                        ctx.fillStyle = char.detail; ctx.beginPath(); ctx.moveTo(-r*0.3, r*0.2); ctx.lineTo(r*0.3, r*0.2); ctx.lineTo(0, r*0.6); ctx.fill(); // Beak
+                        ctx.fillStyle = '#000'; ctx.fillRect(-r*0.6, -r*0.6, r*0.6, r*0.2); ctx.fillRect(0, -r*0.6, r*0.6, r*0.2);
+                        ctx.fillStyle = char.detail; ctx.beginPath(); ctx.moveTo(-r*0.3, r*0.2); ctx.lineTo(r*0.3, r*0.2); ctx.lineTo(0, r*0.6); ctx.fill();
                         break;
                     case 'mouse':
                         ctx.fillStyle = char.color; ctx.beginPath(); ctx.arc(0,0,r*0.8,0,Math.PI*2); ctx.fill();
@@ -633,12 +747,12 @@
                     case 'pixel':
                         ctx.fillStyle = char.color; ctx.fillRect(-r, -r, r*2, r*2);
                         ctx.fillStyle = char.detail; const ps = r*0.3;
-                        ctx.fillRect(-r*0.6, -r*0.5, ps, ps); ctx.fillRect(r*0.3, -r*0.5, ps, ps); // eyes
-                        ctx.fillRect(-r*0.6, r*0.2, r*1.2, ps); // mouth
+                        ctx.fillRect(-r*0.6, -r*0.5, ps, ps); ctx.fillRect(r*0.3, -r*0.5, ps, ps);
+                        ctx.fillRect(-r*0.6, r*0.2, r*1.2, ps);
                         break;
                     case 'ninja':
                         ctx.fillStyle = char.color; ctx.beginPath(); ctx.arc(0,0,r,0,Math.PI*2); ctx.fill();
-                        ctx.fillStyle = char.detail; ctx.shadowColor = char.detail; ctx.shadowBlur = r*0.5;
+                        ctx.fillStyle = char.detail; ctx.shadowColor = char.detail; ctx.shadowBlur = r*0.8;
                         ctx.fillRect(-r*0.8, -r*0.2, r*1.6, r*0.4); ctx.shadowBlur = 0;
                         break;
                     case 'alien':
@@ -649,7 +763,8 @@
                         break;
                     case 'dragon':
                         ctx.fillStyle = char.color; ctx.beginPath(); ctx.ellipse(0, 0, r, r*0.7, 0, 0, Math.PI*2); ctx.fill();
-                        ctx.fillStyle = char.detail; ctx.beginPath(); ctx.ellipse(0, 0, r*0.1, r*0.5, 0, 0, Math.PI*2); ctx.fill();
+                        ctx.fillStyle = char.detail; ctx.shadowColor = '#f1c40f'; ctx.shadowBlur = r*0.5;
+                        ctx.beginPath(); ctx.ellipse(0, 0, r*0.1, r*0.5, 0, 0, Math.PI*2); ctx.fill(); ctx.shadowBlur=0;
                         break;
                 }
                 ctx.restore();
@@ -659,27 +774,26 @@
         class Obstacle {
             constructor() {
                 this.x = CANVAS_WIDTH;
-                const minGapY = 80; const maxGapY = CANVAS_HEIGHT - OBSTACLE_GAP - 80;
+                const gap = DIFFICULTIES[currentDiff].gap;
+                const minGapY = 80; const maxGapY = CANVAS_HEIGHT - gap - 80;
                 this.gapY = Math.floor(Math.random() * (maxGapY - minGapY + 1)) + minGapY;
                 this.passed = false;
             }
-            update() { this.x -= OBSTACLE_SPEED; }
+            update(timeScale) { this.x -= OBSTACLE_SPEED * timeScale; }
             draw(ctx, theme) {
                 const w = OBSTACLE_WIDTH;
                 const topH = this.gapY;
-                const botY = this.gapY + OBSTACLE_GAP;
+                const gap = DIFFICULTIES[currentDiff].gap;
+                const botY = this.gapY + gap;
                 const botH = CANVAS_HEIGHT - botY;
 
                 ctx.save();
                 
-                // Theme-Specific Base Drawing
                 switch(theme.env) {
-                    case 'cityDay':
-                    case 'cityNight':
+                    case 'cityDay': case 'cityNight':
                         ctx.fillStyle = theme.pipeMain;
                         ctx.fillRect(this.x, 0, w, topH); ctx.fillRect(this.x, botY, w, botH);
                         ctx.fillStyle = theme.env === 'cityDay' ? '#ffffff' : '#f1c40f';
-                        // Windows
                         for(let wy = 10; wy < topH - 20; wy += 30) { ctx.fillRect(this.x + 10, wy, 15, 20); ctx.fillRect(this.x + 45, wy, 15, 20); }
                         for(let wy = botY + 20; wy < CANVAS_HEIGHT - 10; wy += 30) { ctx.fillRect(this.x + 10, wy, 15, 20); ctx.fillRect(this.x + 45, wy, 15, 20); }
                         break;
@@ -687,18 +801,22 @@
                         ctx.fillStyle = theme.pipeMain;
                         ctx.fillRect(this.x, 0, w, topH); ctx.fillRect(this.x, botY, w, botH);
                         ctx.strokeStyle = '#5c2a08'; ctx.lineWidth = 2;
-                        // Bark lines
                         for(let i=0; i<5; i++) {
                             ctx.beginPath(); ctx.moveTo(this.x + i*15 + 5, 0); ctx.lineTo(this.x + i*15 + 5, topH); ctx.stroke();
                             ctx.beginPath(); ctx.moveTo(this.x + i*15 + 5, botY); ctx.lineTo(this.x + i*15 + 5, CANVAS_HEIGHT); ctx.stroke();
                         }
+                        break;
+                    case 'dino': // Bone/Fossil pillars
+                        ctx.fillStyle = '#ecf0f1'; // bone white
+                        ctx.fillRect(this.x+10, 0, w-20, topH-15); ctx.fillRect(this.x+10, botY+15, w-20, botH-15);
+                        ctx.beginPath(); ctx.arc(this.x+20, topH-15, 15, 0, Math.PI*2); ctx.arc(this.x+w-20, topH-15, 15, 0, Math.PI*2); ctx.fill(); // joints
+                        ctx.beginPath(); ctx.arc(this.x+20, botY+15, 15, 0, Math.PI*2); ctx.arc(this.x+w-20, botY+15, 15, 0, Math.PI*2); ctx.fill();
                         break;
                     case 'snow':
                         let snowGrad = ctx.createLinearGradient(this.x, 0, this.x+w, 0);
                         snowGrad.addColorStop(0, theme.pipeEdge); snowGrad.addColorStop(0.5, theme.pipeMain); snowGrad.addColorStop(1, theme.pipeEdge);
                         ctx.fillStyle = snowGrad;
                         ctx.fillRect(this.x, 0, w, topH); ctx.fillRect(this.x, botY, w, botH);
-                        // Jagged inner ice
                         ctx.fillStyle = 'rgba(255,255,255,0.4)';
                         ctx.beginPath(); ctx.moveTo(this.x, 0); ctx.lineTo(this.x+20, topH); ctx.lineTo(this.x, topH); ctx.fill();
                         ctx.beginPath(); ctx.moveTo(this.x+w, botY); ctx.lineTo(this.x+w-20, botY+botH); ctx.lineTo(this.x+w, botY+botH); ctx.fill();
@@ -707,7 +825,6 @@
                         ctx.fillStyle = theme.pipeMain;
                         ctx.fillRect(this.x, 0, w, topH); ctx.fillRect(this.x, botY, w, botH);
                         ctx.strokeStyle = '#b08d6a'; ctx.lineWidth = 2;
-                        // Bricks
                         for(let y=0; y<topH; y+=20) { ctx.beginPath(); ctx.moveTo(this.x, y); ctx.lineTo(this.x+w, y); ctx.stroke(); ctx.beginPath(); ctx.moveTo(this.x + ((y/20)%2==0?20:50), y); ctx.lineTo(this.x + ((y/20)%2==0?20:50), y+20); ctx.stroke(); }
                         for(let y=botY; y<CANVAS_HEIGHT; y+=20) { ctx.beginPath(); ctx.moveTo(this.x, y); ctx.lineTo(this.x+w, y); ctx.stroke(); ctx.beginPath(); ctx.moveTo(this.x + ((y/20)%2==0?20:50), y); ctx.lineTo(this.x + ((y/20)%2==0?20:50), y+20); ctx.stroke(); }
                         break;
@@ -715,7 +832,6 @@
                         ctx.fillStyle = theme.pipeMain;
                         ctx.fillRect(this.x, 0, w, topH); ctx.fillRect(this.x, botY, w, botH);
                         ctx.strokeStyle = '#dc2f02'; ctx.lineWidth = 3;
-                        // Lava cracks
                         ctx.beginPath(); ctx.moveTo(this.x+20, 0); ctx.lineTo(this.x+40, topH/2); ctx.lineTo(this.x+10, topH); ctx.stroke();
                         ctx.beginPath(); ctx.moveTo(this.x+50, botY); ctx.lineTo(this.x+20, botY+botH/2); ctx.lineTo(this.x+60, CANVAS_HEIGHT); ctx.stroke();
                         break;
@@ -723,7 +839,6 @@
                         ctx.fillStyle = theme.pipeMain;
                         ctx.fillRect(this.x, 0, w, topH); ctx.fillRect(this.x, botY, w, botH);
                         ctx.fillStyle = '#03045e';
-                        // Barnacles
                         for(let i=0; i<4; i++) { ctx.beginPath(); ctx.arc(this.x+20+(i%2)*30, 40+i*40, 10, 0, Math.PI*2); ctx.fill(); }
                         for(let i=0; i<4; i++) { ctx.beginPath(); ctx.arc(this.x+20+(i%2)*30, botY+40+i*40, 10, 0, Math.PI*2); ctx.fill(); }
                         break;
@@ -731,7 +846,6 @@
                         ctx.fillStyle = theme.pipeMain;
                         ctx.fillRect(this.x, 0, w, topH); ctx.fillRect(this.x, botY, w, botH);
                         ctx.strokeStyle = '#d4cfb6'; ctx.lineWidth = 4;
-                        // Pillar fluting
                         for(let lx=this.x+15; lx<this.x+w; lx+=20) {
                             ctx.beginPath(); ctx.moveTo(lx, 0); ctx.lineTo(lx, topH); ctx.stroke();
                             ctx.beginPath(); ctx.moveTo(lx, botY); ctx.lineTo(lx, CANVAS_HEIGHT); ctx.stroke();
@@ -741,21 +855,24 @@
                         ctx.fillStyle = theme.pipeMain;
                         ctx.fillRect(this.x, 0, w, topH); ctx.fillRect(this.x, botY, w, botH);
                         ctx.strokeStyle = theme.pipeEdge; ctx.lineWidth = 1;
-                        // Grid scanlines
                         let scanY = (frames * 2) % 40;
                         for(let y=scanY; y<topH; y+=40) { ctx.strokeRect(this.x, y, w, 5); }
                         for(let y=botY+scanY; y<CANVAS_HEIGHT; y+=40) { ctx.strokeRect(this.x, y, w, 5); }
+                        break;
+                    case 'infinity':
+                        ctx.strokeStyle = `hsl(${(frames*2)%360}, 100%, 50%)`; ctx.lineWidth = 4;
+                        ctx.fillStyle = '#111';
+                        ctx.fillRect(this.x, 0, w, topH); ctx.strokeRect(this.x, 0, w, topH);
+                        ctx.fillRect(this.x, botY, w, botH); ctx.strokeRect(this.x, botY, w, botH);
                         break;
                     case 'space':
                         ctx.fillStyle = theme.pipeMain;
                         ctx.fillRect(this.x, 0, w, topH); ctx.fillRect(this.x, botY, w, botH);
                         ctx.fillStyle = theme.pipeEdge;
-                        // Metallic panels
                         for(let y=10; y<topH-10; y+=60) { ctx.fillRect(this.x+10, y, w-20, 40); }
                         for(let y=botY+10; y<CANVAS_HEIGHT-10; y+=60) { ctx.fillRect(this.x+10, y, w-20, 40); }
                         break;
                     default:
-                        // Generic fallback pipe
                         const grad = ctx.createLinearGradient(this.x, 0, this.x + w, 0);
                         grad.addColorStop(0, theme.pipeEdge); grad.addColorStop(0.5, theme.pipeMain); grad.addColorStop(1, theme.pipeEdge);
                         ctx.fillStyle = grad;
@@ -763,11 +880,12 @@
                         break;
                 }
 
-                // Standard Caps for clear gameplay boundary
-                ctx.fillStyle = theme.pipeEdge; ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.lineWidth = 2;
-                ctx.fillRect(this.x - 4, this.gapY - 20, w + 8, 20); ctx.strokeRect(this.x - 4, this.gapY - 20, w + 8, 20);
-                ctx.fillRect(this.x - 4, botY, w + 8, 20); ctx.strokeRect(this.x - 4, botY, w + 8, 20);
-                
+                // Standard Caps for clear gameplay boundary (skip for infinity/dino for aesthetics)
+                if (theme.env !== 'infinity' && theme.env !== 'dino') {
+                    ctx.fillStyle = theme.pipeEdge; ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.lineWidth = 2;
+                    ctx.fillRect(this.x - 4, this.gapY - 20, w + 8, 20); ctx.strokeRect(this.x - 4, this.gapY - 20, w + 8, 20);
+                    ctx.fillRect(this.x - 4, botY, w + 8, 20); ctx.strokeRect(this.x - 4, botY, w + 8, 20);
+                }
                 ctx.restore();
             }
         }
@@ -782,7 +900,6 @@
                 this.decay = 0.05 + Math.random()*0.05;
                 this.wobble = Math.random() * Math.PI * 2;
 
-                // Specific overrides
                 if(type === 'wind') { this.vy = (Math.random()-0.5)*5; this.color = 'rgba(255,255,255,0.7)'; }
                 if(type === 'feather') { this.vx = -OBSTACLE_SPEED*0.5; this.vy = Math.random()*2; }
                 if(type === 'star') { this.size = Math.random()*6 + 4; }
@@ -790,18 +907,18 @@
                 if(type === 'ember') { this.vy = -Math.random()*3 - 1; }
                 if(type === 'pixel') { this.size = 6; }
             }
-            update() {
+            update(timeScale) {
                 if(this.type === 'feather') {
-                    this.wobble += 0.1;
-                    this.x += this.vx + Math.sin(this.wobble)*2;
-                    this.y += this.vy;
+                    this.wobble += 0.1 * timeScale;
+                    this.x += (this.vx + Math.sin(this.wobble)*2) * timeScale;
+                    this.y += this.vy * timeScale;
                 } else if(this.type === 'glitch') {
-                    if(Math.random()>0.5) this.y += (Math.random()-0.5)*20;
-                    this.x += this.vx;
+                    if(Math.random()>0.5) this.y += ((Math.random()-0.5)*20) * timeScale;
+                    this.x += this.vx * timeScale;
                 } else {
-                    this.x += this.vx; this.y += this.vy; 
+                    this.x += this.vx * timeScale; this.y += this.vy * timeScale; 
                 }
-                this.life -= this.decay;
+                this.life -= this.decay * timeScale;
             }
             draw(ctx) {
                 ctx.fillStyle = this.color; ctx.globalAlpha = Math.max(0, this.life);
@@ -828,7 +945,7 @@
                 this.text = text; this.x = x; this.y = y; this.color = color; this.size = size;
                 this.life = 1.0; this.vy = -1.5;
             }
-            update() { this.y += this.vy; this.life -= 0.02; }
+            update(timeScale) { this.y += this.vy * timeScale; this.life -= 0.02 * timeScale; }
             draw(ctx) {
                 ctx.globalAlpha = Math.max(0, this.life);
                 ctx.fillStyle = this.color; ctx.font = `bold ${this.size} Arial`; ctx.textAlign='center';
@@ -852,7 +969,7 @@
             window.addEventListener('keydown', handleInput);
             canvas.addEventListener('mousedown', handleInput);
             canvas.addEventListener('touchstart', e => { 
-                if (e.touches.length > 1) return; // Prevent multi-touch zooming/bugs
+                if (e.touches.length > 1) return;
                 e.preventDefault(); 
                 handleInput(e); 
             }, {passive: false});
@@ -868,6 +985,17 @@
             document.getElementById('statsBtn').addEventListener('click', showStats);
             document.querySelectorAll('.closeModalBtn').forEach(b => b.addEventListener('click', () => switchScreen('START')));
             
+            // Difficulty Selection
+            document.querySelectorAll('.diff-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    document.querySelectorAll('.diff-btn').forEach(b => b.classList.remove('selected'));
+                    e.target.classList.add('selected');
+                    currentDiff = e.target.getAttribute('data-diff');
+                    selectedStartLevel = Math.max(...profile.unlockedLevels[currentDiff]);
+                    updateMenuUI();
+                });
+            });
+
             document.getElementById('equipUnlockBtn').addEventListener('click', () => {
                 if(recentlyUnlockedHeroes.length > 0) selectedCharacterId = recentlyUnlockedHeroes[0].id;
                 recentlyUnlockedHeroes.shift();
@@ -885,8 +1013,6 @@
         }
 
         function resize() {
-            // Internal logic operates at a fixed 800x600 for consistent physics and speeds
-            // CSS object-fit: contain handles the actual layout bounding and letterboxing natively.
             const dpr = window.devicePixelRatio || 1;
             canvas.width = CANVAS_WIDTH * dpr; 
             canvas.height = CANVAS_HEIGHT * dpr;
@@ -914,7 +1040,7 @@
                 updateMenuUI();
                 document.getElementById('startScreen').classList.add('active-screen');
                 document.getElementById('hud').classList.remove('hud-visible');
-                bgSystem.initTheme(THEMES[selectedStartLevel]);
+                bgSystem.initTheme(getThemeForLevel(selectedStartLevel));
             }
             if(screenName === 'GAMEOVER') {
                 document.getElementById('gameOverScreen').classList.add('active-screen');
@@ -937,20 +1063,24 @@
                 document.getElementById('challengeProgress').innerText = c.completed ? "COMPLETED" : `${c.progress}/${c.target}`;
                 document.getElementById('challengeProgress').style.color = c.completed ? "var(--primary)" : "var(--light)";
             }
-            selectedStartLevel = Math.max(...profile.unlockedLevels);
+            selectedStartLevel = Math.max(...profile.unlockedLevels[currentDiff]);
             switchScreen('START');
         }
 
         function updateMenuUI() {
-            const theme = THEMES[selectedStartLevel];
-            document.getElementById('startLevelName').innerText = `Level ${selectedStartLevel}: ${theme.name}`;
-            document.getElementById('startLevelScore').innerText = profile.levelHighScores[selectedStartLevel] || 0;
+            const theme = getThemeForLevel(selectedStartLevel);
+            const levelLabel = selectedStartLevel > MAX_THEME_LEVEL ? `Checkpoint ${selectedStartLevel}` : `Level ${selectedStartLevel}`;
+            document.getElementById('startLevelName').innerText = `${levelLabel}: ${theme.name}`;
+            document.getElementById('startLevelScore').innerText = profile.levelHighScores[currentDiff][selectedStartLevel] || 0;
             document.getElementById('prevLevelBtn').disabled = selectedStartLevel === 0;
-            document.getElementById('nextLevelBtn').disabled = !profile.unlockedLevels.includes(selectedStartLevel + 1);
+            document.getElementById('nextLevelBtn').disabled = !profile.unlockedLevels[currentDiff].includes(selectedStartLevel + 1);
 
             const grid = document.getElementById('character-grid'); grid.innerHTML = '';
+            // Hero unlocks are global (based on best score across any difficulty)
+            const globalBest = Math.max(profile.highScores.easy, profile.highScores.medium, profile.highScores.hard);
+            
             CHARACTERS.forEach(char => {
-                const isLocked = profile.highScore < char.req;
+                const isLocked = globalBest < char.req;
                 const card = document.createElement('div');
                 card.className = `char-card ${isLocked ? 'locked' : ''} ${selectedCharacterId === char.id ? 'selected' : ''}`;
                 
@@ -963,7 +1093,7 @@
 
                 card.innerHTML = `<img src="${tempCanvas.toDataURL()}" class="char-icon-preview">
                     <div class="char-name">${char.name}</div>
-                    ${isLocked ? `<div class="char-req">Req: ${char.req} pts</div>` : ''}`;
+                    ${isLocked ? `<div class="char-req">Req: ${char.req}</div>` : ''}`;
                 
                 if (!isLocked) card.addEventListener('click', () => { selectedCharacterId = char.id; updateMenuUI(); });
                 grid.appendChild(card);
@@ -972,9 +1102,9 @@
 
         function changeStartLevel(dir) {
             const next = selectedStartLevel + dir;
-            if (profile.unlockedLevels.includes(next)) {
+            if (profile.unlockedLevels[currentDiff].includes(next)) {
                 selectedStartLevel = next; updateMenuUI();
-                bgSystem.initTheme(THEMES[selectedStartLevel]);
+                bgSystem.initTheme(getThemeForLevel(selectedStartLevel));
             }
         }
 
@@ -984,7 +1114,7 @@
             leaderboard.forEach((e, i) => {
                 list.innerHTML += `<div class="list-item">
                     <span>#${i+1} <strong>${e.name}</strong></span>
-                    <span>${e.score} pts (Lvl ${e.level})</span>
+                    <span>${e.score} pts (Lvl ${e.level}) [${e.diff}]</span>
                 </div>`;
             });
             switchScreen('LEADERBOARD');
@@ -994,11 +1124,17 @@
             document.getElementById('statName').innerText = profile.name;
             document.getElementById('statRuns').innerText = profile.totalRuns;
             document.getElementById('statTotalScore').innerText = profile.totalScore;
-            document.getElementById('statMaxLevel').innerText = Math.max(...profile.unlockedLevels);
+            
+            let maxLvlAll = Math.max(
+                ...profile.unlockedLevels.easy,
+                ...profile.unlockedLevels.medium,
+                ...profile.unlockedLevels.hard
+            );
+            document.getElementById('statMaxLevel').innerText = maxLvlAll;
             
             let fav = 'Orb', maxPlays = 0;
             for(let id in profile.heroPlays) {
-                if(profile.heroPlays[id] > maxPlays) { maxPlays = profile.heroPlays[id]; fav = CHARACTERS.find(c=>c.id==id).name; }
+                if(profile.heroPlays[id] > maxPlays) { maxPlays = profile.heroPlays[id]; fav = (CHARACTERS.find(c=>c.id==id)||{}).name || fav; }
             }
             document.getElementById('statFavHero').innerText = fav;
             switchScreen('STATS');
@@ -1020,29 +1156,41 @@
             obstacles = []; particles = []; floatingTexts = [];
             currentLevel = selectedStartLevel;
             runScore = 0;
-            globalScore = currentLevel * 10;
+            globalScore = getStartScoreForLevel(currentLevel);
             frames = 0; recentlyUnlockedHeroes = [];
+            screenShake = 0;
 
-            bgSystem.initTheme(THEMES[currentLevel]);
+            bgSystem.initTheme(getThemeForLevel(currentLevel));
 
             document.getElementById('hudScore').innerText = globalScore;
             document.getElementById('hudLevel').innerText = currentLevel;
+            document.getElementById('hudLevelLabel').innerText = currentLevel > MAX_THEME_LEVEL ? "CHK" : "LVL";
+            document.getElementById('hudDiff').innerText = DIFFICULTIES[currentDiff].label;
             
             switchScreen('PLAYING');
             document.getElementById('hud').classList.add('hud-visible');
             
-            showCenterMsg(`CHECKPOINT: LEVEL ${currentLevel}`, THEMES[currentLevel].pipeMain);
+            let msg = currentLevel > MAX_THEME_LEVEL ? `CHECKPOINT ${currentLevel}` : `LEVEL ${currentLevel}`;
+            showCenterMsg(msg, getThemeForLevel(currentLevel).pipeMain);
+        }
+
+        function triggerDeath() {
+            if (currentState === 'DYING') return; // Prevent double trigger
+            currentState = 'DYING';
+            playSound('crash');
+            player.explode();
+            screenShake = 20;
+            deathTimer = 60; // Frames of slow-mo death
         }
 
         function gameOver() {
-            playSound('crash');
             profile.totalScore += runScore;
 
             let newRecord = false;
-            if (globalScore > profile.highScore) { profile.highScore = globalScore; newRecord = true; }
+            if (globalScore > profile.highScores[currentDiff]) { profile.highScores[currentDiff] = globalScore; newRecord = true; }
             
-            let levelRecord = profile.levelHighScores[selectedStartLevel] || 0;
-            if (runScore > levelRecord) profile.levelHighScores[selectedStartLevel] = runScore;
+            let levelRecord = profile.levelHighScores[currentDiff][selectedStartLevel] || 0;
+            if (runScore > levelRecord) profile.levelHighScores[currentDiff][selectedStartLevel] = runScore;
 
             updateLeaderboard(globalScore, currentLevel);
             
@@ -1057,14 +1205,15 @@
 
             saveData();
 
-            let previousLocks = CHARACTERS.filter(c => c.req > (profile.highScore - runScore)); 
-            recentlyUnlockedHeroes = previousLocks.filter(c => profile.highScore >= c.req && c.req > 0);
+            let globalBest = Math.max(profile.highScores.easy, profile.highScores.medium, profile.highScores.hard);
+            let previousLocks = CHARACTERS.filter(c => c.req > (globalBest - runScore)); 
+            recentlyUnlockedHeroes = previousLocks.filter(c => globalBest >= c.req && c.req > 0);
 
             document.getElementById('endScore').innerText = globalScore;
-            document.getElementById('endLevelName').innerText = THEMES[currentLevel].name;
-            document.getElementById('newRecordMsg').innerText = newRecord ? "NEW ALL-TIME RECORD!" : `Run Score: +${runScore}`;
+            document.getElementById('endLevelName').innerText = getThemeForLevel(currentLevel).name;
+            document.getElementById('newRecordMsg').innerText = newRecord ? "NEW RECORD FOR DIFFICULTY!" : `Run Score: +${runScore}`;
 
-            setTimeout(() => { processNextUnlockOrMenu(); }, 500);
+            setTimeout(() => { processNextUnlockOrMenu(); }, 300);
         }
 
         function processNextUnlockOrMenu() {
@@ -1084,75 +1233,104 @@
         }
 
         function shareScore() {
-            const text = `Flappy Heroes Multiverse\nAgent: ${profile.name}\nScore: ${globalScore} (Level ${currentLevel})\nHero: ${CHARACTERS[selectedCharacterId].name}\nPlay now!`;
+            const text = `Flappy Heroes Multiverse\nAgent: ${profile.name}\nDifficulty: ${DIFFICULTIES[currentDiff].label}\nScore: ${globalScore} (Level ${currentLevel})\nHero: ${CHARACTERS[selectedCharacterId].name}\nPlay now!`;
             if (navigator.share) { navigator.share({ title: 'My Score', text: text }); } 
             else { navigator.clipboard.writeText(text); alert("Score copied to clipboard!"); }
         }
 
         function levelUp() {
-            if (currentLevel < MAX_LEVEL) {
-                currentLevel++;
-                if (!profile.unlockedLevels.includes(currentLevel)) {
-                    profile.unlockedLevels.push(currentLevel); saveData();
-                }
-                playSound('milestone'); screenPulseAlpha = 0.5;
-                floatingTexts.push(new FloatingText("LEVEL UP!", player.x, player.y - 40, '#f1c40f', '24px'));
-                
-                bgSystem.initTheme(THEMES[currentLevel]);
-                document.getElementById('hudLevel').innerText = currentLevel;
-                showCenterMsg(THEMES[currentLevel].name, THEMES[currentLevel].pipeMain);
+            currentLevel++;
+            if (!profile.unlockedLevels[currentDiff].includes(currentLevel)) {
+                profile.unlockedLevels[currentDiff].push(currentLevel); saveData();
             }
+            playSound('milestone'); screenPulseAlpha = 0.5;
+            
+            const isCheckpoint = currentLevel > MAX_THEME_LEVEL;
+            floatingTexts.push(new FloatingText(isCheckpoint ? "CHECKPOINT REACHED!" : "LEVEL CLEARED!", player.x, player.y - 40, '#f1c40f', '24px'));
+            
+            const theme = getThemeForLevel(currentLevel);
+            bgSystem.initTheme(theme);
+            document.getElementById('hudLevel').innerText = currentLevel;
+            document.getElementById('hudLevelLabel').innerText = isCheckpoint ? "CHK" : "LVL";
+            showCenterMsg(isCheckpoint ? `CHECKPOINT ${currentLevel}` : theme.name, theme.pipeMain);
         }
 
         function updateGame() {
             frames++;
-            bgSystem.update();
-            particles.forEach(p => p.update()); particles = particles.filter(p => p.life > 0);
-            floatingTexts.forEach(ft => ft.update()); floatingTexts = floatingTexts.filter(ft => ft.life > 0);
-
-            if (currentState !== 'PLAYING') return;
-            player.update();
-            if (frames % SPAWN_RATE === 0) obstacles.push(new Obstacle());
-
-            for (let i = obstacles.length - 1; i >= 0; i--) {
-                let obs = obstacles[i]; obs.update();
-
-                const hitM = 4;
-                if (player.x + player.radius - hitM > obs.x && player.x - player.radius + hitM < obs.x + OBSTACLE_WIDTH) {
-                    if (player.y - player.radius + hitM < obs.gapY || player.y + player.radius - hitM > obs.gapY + OBSTACLE_GAP) {
-                        gameOver();
-                    }
-                }
-
-                if (obs.x + OBSTACLE_WIDTH < player.x && !obs.passed) {
-                    globalScore++; runScore++; obs.passed = true;
-                    document.getElementById('hudScore').innerText = globalScore;
-                    playSound('score');
-                    floatingTexts.push(new FloatingText("+1", player.x, player.y - 20, '#fff'));
-                    if (globalScore > 0 && globalScore % LEVEL_THRESHOLD === 0) levelUp();
-                }
-                if (obs.x + OBSTACLE_WIDTH < 0) obstacles.splice(i, 1);
+            
+            // Handle slow-mo during death
+            let timeScale = 1.0;
+            if (currentState === 'DYING') {
+                timeScale = 0.2; // 20% speed
+                deathTimer--;
+                if (deathTimer <= 0) gameOver();
             }
+
+            bgSystem.update(timeScale);
+            particles.forEach(p => p.update(timeScale)); particles = particles.filter(p => p.life > 0);
+            floatingTexts.forEach(ft => ft.update(timeScale)); floatingTexts = floatingTexts.filter(ft => ft.life > 0);
+
+            if (currentState !== 'PLAYING' && currentState !== 'DYING') return;
+            
+            player.update(timeScale);
+            
+            if (currentState === 'PLAYING') {
+                if (frames % SPAWN_RATE === 0) obstacles.push(new Obstacle());
+
+                for (let i = obstacles.length - 1; i >= 0; i--) {
+                    let obs = obstacles[i]; obs.update(timeScale);
+
+                    const hitM = 4;
+                    const gap = DIFFICULTIES[currentDiff].gap;
+                    if (player.x + player.radius - hitM > obs.x && player.x - player.radius + hitM < obs.x + OBSTACLE_WIDTH) {
+                        if (player.y - player.radius + hitM < obs.gapY || player.y + player.radius - hitM > obs.gapY + gap) {
+                            triggerDeath();
+                        }
+                    }
+
+                    if (obs.x + OBSTACLE_WIDTH < player.x && !obs.passed) {
+                        globalScore++; runScore++; obs.passed = true;
+                        document.getElementById('hudScore').innerText = globalScore;
+                        playSound('score');
+                        floatingTexts.push(new FloatingText("+1", player.x, player.y - 20, '#fff'));
+                        
+                        let threshold = (currentLevel >= MAX_THEME_LEVEL) ? 20 : 10;
+                        if (runScore > 0 && runScore % threshold === 0) levelUp();
+                    }
+                    if (obs.x + OBSTACLE_WIDTH < 0) obstacles.splice(i, 1);
+                }
+            } else if (currentState === 'DYING') {
+                // Keep moving obstacles slowly, no new ones, no collisions
+                obstacles.forEach(obs => obs.update(timeScale));
+            }
+
             if (screenPulseAlpha > 0) screenPulseAlpha -= 0.02;
+            if (screenShake > 0) screenShake--;
         }
 
         function drawGame() {
-            const theme = THEMES[currentLevel] || THEMES[0];
+            const theme = getThemeForLevel(currentLevel);
             const bgGrad = ctx.createLinearGradient(0, 0, 0, CANVAS_HEIGHT);
             bgGrad.addColorStop(0, theme.bgTop); bgGrad.addColorStop(1, theme.bgBot);
             ctx.fillStyle = bgGrad; ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+            ctx.save();
+            if (screenShake > 0) {
+                ctx.translate((Math.random() - 0.5) * 15, (Math.random() - 0.5) * 15);
+            }
 
             bgSystem.draw(ctx);
             obstacles.forEach(obs => obs.draw(ctx, theme));
             particles.forEach(p => p.draw(ctx));
 
-            if (currentState === 'PLAYING' || currentState === 'GAMEOVER') player.draw(ctx);
+            if (currentState === 'PLAYING' || currentState === 'DYING' || currentState === 'GAMEOVER') player.draw(ctx);
             floatingTexts.forEach(ft => ft.draw(ctx));
 
             if (screenPulseAlpha > 0) {
                 ctx.fillStyle = `rgba(255, 255, 255, ${Math.max(0, screenPulseAlpha)})`;
                 ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
             }
+            ctx.restore();
         }
 
         function loop() { updateGame(); drawGame(); requestAnimationFrame(loop); }
