@@ -188,10 +188,16 @@ export default function App() {
             box: new THREE.BoxGeometry(1, 1, 1),
             sphere: new THREE.SphereGeometry(1, 16, 16),
             cyl: new THREE.CylinderGeometry(1, 1, 1, 16),
+            cone: new THREE.ConeGeometry(1, 1, 16),
+            icosa: new THREE.IcosahedronGeometry(1, 0),
             torus: new THREE.TorusGeometry(0.8, 0.3, 16, 32),
-            coin: new THREE.TorusGeometry(0.5, 0.15, 8, 16)
+            coin: new THREE.TorusGeometry(0.5, 0.15, 8, 16),
+            invisible: new THREE.BoxGeometry(1, 1, 1)
         };
-        const MATS = { coin: new THREE.MeshStandardMaterial({ color: 0xffd700, emissive: 0xffaa00, roughness: 0.2, metalness: 0.8 }) };
+        const MATS = { 
+            coin: new THREE.MeshStandardMaterial({ color: 0xffd700, emissive: 0xffaa00, roughness: 0.2, metalness: 0.8 }),
+            invisible: new THREE.MeshBasicMaterial({ visible: false }) 
+        };
 
         function getMat(colorHex, emissiveHex = 0x000000, wireframe = false) {
             const key = `${colorHex}_${emissiveHex}_${wireframe}`;
@@ -208,15 +214,29 @@ export default function App() {
 
             const c1 = parseInt(char.c1.replace('#','0x'));
             const c2 = parseInt(char.c2.replace('#','0x'));
-            const m = new THREE.Mesh(GEOS.box, getMat(c1, c2));
-            m.castShadow = true;
-            
-            // Apply shapes based on hero
-            if(char.id === 0 || char.id === 5 || char.id >= 9) m.geometry = GEOS.sphere;
-            if(char.id === 3 || char.id === 8) m.geometry = GEOS.cyl;
-            if(char.id === 6 || char.id === 11) m.geometry = GEOS.torus;
+            const mat1 = getMat(c1); const mat2 = getMat(c2);
+            let m1, m2, m3;
 
-            playerMesh.add(m);
+            switch(char.id) {
+                case 0: m1 = new THREE.Mesh(GEOS.sphere, getMat(c1, c1)); m1.scale.set(0.7,0.7,0.7); m2 = new THREE.Mesh(GEOS.icosa, getMat(0xffffff, 0x000000, true)); m2.scale.set(1.2,1.2,1.2); playerMesh.add(m1, m2); break;
+                case 1: m1 = new THREE.Mesh(GEOS.box, mat1); m1.scale.set(1.2, 1.4, 1.2); m2 = new THREE.Mesh(GEOS.box, mat2); m2.scale.set(1.3, 0.8, 1.3); m2.position.set(0, 0.1, 0.1); m3 = new THREE.Mesh(GEOS.box, getMat(0x00ffff, 0x00ffff)); m3.scale.set(0.8, 0.2, 1.4); m3.position.set(0, 0.3, 0.2); playerMesh.add(m1, m2, m3); break;
+                case 2: m1 = new THREE.Mesh(GEOS.box, mat1); m1.scale.set(1.5, 1.5, 1.5); m2 = new THREE.Mesh(GEOS.box, getMat(0x551a8b)); m2.scale.set(1.55, 0.5, 1.55); m2.position.y = -0.5; playerMesh.add(m1, m2); break;
+                case 3: m1 = new THREE.Mesh(GEOS.cyl, mat2); m1.scale.set(1.4, 0.2, 1.4); m1.rotation.x = Math.PI/2; m2 = new THREE.Mesh(GEOS.cyl, getMat(0xffffff)); m2.scale.set(1.0, 0.25, 1.0); m2.rotation.x = Math.PI/2; m3 = new THREE.Mesh(GEOS.cyl, mat1); m3.scale.set(0.6, 0.3, 0.6); m3.rotation.x = Math.PI/2; playerMesh.add(m1, m2, m3); break;
+                case 4: m1 = new THREE.Mesh(GEOS.box, mat1); m1.scale.set(1.2, 0.8, 0.8); m2 = new THREE.Mesh(GEOS.cyl, mat2); m2.scale.set(0.2, 1.5, 0.2); m2.position.y = -0.8; playerMesh.add(m1, m2); break;
+                case 5: m1 = new THREE.Mesh(GEOS.sphere, mat1); m1.scale.set(1.2, 1.2, 1.2); m2 = new THREE.Mesh(GEOS.sphere, getMat(0xffffff)); m2.scale.set(0.4, 0.6, 0.2); m2.position.set(0.4, 0.2, 1.0); m2.rotation.z = -0.2; m3 = new THREE.Mesh(GEOS.sphere, getMat(0xffffff)); m3.scale.set(0.4, 0.6, 0.2); m3.position.set(-0.4, 0.2, 1.0); m3.rotation.z = 0.2; playerMesh.add(m1, m2, m3); break;
+                case 6: m1 = new THREE.Mesh(GEOS.sphere, mat1); m1.scale.set(1.2, 1.2, 1.2); m2 = new THREE.Mesh(GEOS.cyl, mat2); m2.scale.set(1.25, 0.3, 1.25); m2.position.y = 0.3; m3 = new THREE.Mesh(GEOS.box, getMat(0xdddddd)); m3.scale.set(0.8, 0.4, 1.3); m3.position.set(0, 0.3, 0.1); playerMesh.add(m1, m2, m3); break;
+                case 7: m1 = new THREE.Mesh(GEOS.icosa, getMat(c1, c1)); m1.scale.set(1.2, 1.2, 1.2); m2 = new THREE.Mesh(GEOS.icosa, getMat(c2, c2, true)); m2.scale.set(1.5, 1.5, 1.5); playerMesh.add(m1, m2); break;
+                case 8: m1 = new THREE.Mesh(GEOS.cyl, mat1); m1.scale.set(0.8, 1.5, 0.8); m2 = new THREE.Mesh(GEOS.cyl, mat2); m2.scale.set(0.3, 0.3, 0.3); m2.position.y = 0.9; playerMesh.add(m1, m2); break;
+                case 9: m1 = new THREE.Mesh(GEOS.sphere, mat1); m1.scale.set(1.2, 1.2, 1.2); m2 = new THREE.Mesh(GEOS.cone, mat2); m2.scale.set(0.6, 1.0, 0.6); m2.position.set(0, 0, 1.2); m2.rotation.x = Math.PI/2; playerMesh.add(m1, m2); break;
+                case 10: m1 = new THREE.Mesh(GEOS.sphere, mat1); m1.scale.set(1.1, 1.1, 1.1); m2 = new THREE.Mesh(GEOS.cyl, mat1); m2.scale.set(0.6, 0.1, 0.6); m2.position.set(0.8, 0.8, 0); m2.rotation.x = Math.PI/2; m3 = new THREE.Mesh(GEOS.cyl, mat1); m3.scale.set(0.6, 0.1, 0.6); m3.position.set(-0.8, 0.8, 0); m3.rotation.x = Math.PI/2; playerMesh.add(m1, m2, m3); break;
+                case 11: m1 = new THREE.Mesh(GEOS.torus, mat1); m1.scale.set(1.2, 1.2, 1.2); m2 = new THREE.Mesh(GEOS.cyl, mat2); m2.scale.set(0.8, 0.6, 0.8); m2.rotation.x = Math.PI/2; playerMesh.add(m1, m2); break;
+                case 12: m1 = new THREE.Mesh(GEOS.box, mat1); m1.scale.set(1.4, 1.4, 1.4); m2 = new THREE.Mesh(GEOS.box, mat2); m2.scale.set(0.3, 0.3, 1.5); m2.position.set(-0.3, 0.2, 0.1); m3 = new THREE.Mesh(GEOS.box, mat2); m3.scale.set(0.3, 0.3, 1.5); m3.position.set(0.3, 0.2, 0.1); playerMesh.add(m1, m2, m3); break;
+                case 13: m1 = new THREE.Mesh(GEOS.sphere, mat1); m1.scale.set(1.2, 1.2, 1.2); m2 = new THREE.Mesh(GEOS.box, getMat(c2, c2)); m2.scale.set(1.5, 0.3, 1.0); m2.position.set(0, 0.2, 0.5); playerMesh.add(m1, m2); break;
+                case 14: m1 = new THREE.Mesh(GEOS.sphere, mat1); m1.scale.set(1.0, 1.4, 1.0); m2 = new THREE.Mesh(GEOS.sphere, mat2); m2.scale.set(0.4, 0.6, 0.3); m2.position.set(0.4, 0.2, 0.8); m2.rotation.z = -0.3; m2.rotation.y = 0.3; m3 = new THREE.Mesh(GEOS.sphere, mat2); m3.scale.set(0.4, 0.6, 0.3); m3.position.set(-0.4, 0.2, 0.8); m3.rotation.z = 0.3; m3.rotation.y = -0.3; playerMesh.add(m1, m2, m3); break;
+                case 15: m1 = new THREE.Mesh(GEOS.sphere, mat1); m1.scale.set(1.2, 1.4, 1.2); m2 = new THREE.Mesh(GEOS.cone, mat2); m2.scale.set(0.3, 1.0, 0.3); m2.position.set(0.6, 1.0, 0); m2.rotation.z = -0.3; m3 = new THREE.Mesh(GEOS.cone, mat2); m3.scale.set(0.3, 1.0, 0.3); m3.position.set(-0.6, 1.0, 0); m3.rotation.z = 0.3; playerMesh.add(m1, m2, m3); break;
+            }
+
+            playerMesh.children.forEach(c => { c.castShadow = true; c.receiveShadow = true; });
             playerLight.color.setHex(c1);
         };
 
@@ -227,46 +247,104 @@ export default function App() {
             dirLight.color.setHex(0xffffff);
         };
 
+        const buildThematicObstacle = (group, theme, w, h, d, isTop) => {
+            const baseMat = getMat(theme.pipe); const neonMat = getMat(theme.neon, theme.neon);
+            let m1, m2;
+            if (theme.env === 'cityDay' || theme.env === 'cityNight') {
+                m1 = new THREE.Mesh(GEOS.box, baseMat); m1.scale.set(w, h, d);
+                m2 = new THREE.Mesh(GEOS.box, neonMat); m2.scale.set(w*0.8, h, d*1.1); 
+                const m3 = new THREE.Mesh(GEOS.box, getMat(0x111111)); m3.scale.set(w*1.05, h, d*1.05); m3.material.wireframe = true;
+                group.add(m1, m2, m3);
+            } 
+            else if (theme.env === 'jungle') {
+                m1 = new THREE.Mesh(GEOS.cyl, baseMat); m1.scale.set(w*0.5, h, d*0.5);
+                m2 = new THREE.Mesh(GEOS.cyl, getMat(theme.neon)); m2.scale.set(w*0.7, h*0.8, d*0.7); m2.position.y = isTop ? h*0.1 : -h*0.1;
+                group.add(m1, m2);
+            }
+            else if (theme.env === 'snow') {
+                m1 = new THREE.Mesh(GEOS.cyl, getMat(theme.pipe, 0x000000, false)); m1.scale.set(w*0.6, h, d*0.6); m1.material.transparent = true; m1.material.opacity = 0.8;
+                m2 = new THREE.Mesh(GEOS.cone, neonMat); m2.scale.set(w*0.8, h*0.5, d*0.8); m2.position.y = isTop ? -h/2 : h/2; m2.rotation.x = isTop ? Math.PI : 0;
+                group.add(m1, m2);
+            }
+            else if (theme.env === 'desert') {
+                for(let i=0; i<3; i++) { let step = new THREE.Mesh(GEOS.box, baseMat); let stepScale = 1 - (i*0.2); step.scale.set(w*stepScale, h/3, d*stepScale); step.position.y = isTop ? (h/2) - (i * h/3) : (-h/2) + (i * h/3); group.add(step); }
+            }
+            else if (theme.env === 'volcano') {
+                m1 = new THREE.Mesh(GEOS.cone, getMat(0x111111)); m1.scale.set(w*0.8, h, d*0.8); m1.position.y = isTop ? h/2 : -h/2; m1.rotation.x = isTop ? Math.PI : 0;
+                m2 = new THREE.Mesh(GEOS.cone, neonMat); m2.scale.set(w*0.85, h*0.9, d*0.85); m2.position.y = isTop ? h/2 : -h/2; m2.rotation.x = isTop ? Math.PI : 0; m2.material.wireframe = true;
+                group.add(m1, m2);
+            }
+            else if (theme.env === 'water') {
+                m1 = new THREE.Mesh(GEOS.cyl, baseMat); m1.scale.set(w*0.4, h, d*0.4);
+                m2 = new THREE.Mesh(GEOS.sphere, neonMat); m2.scale.set(w*0.3, w*0.3, d*0.3); m2.position.set(w*0.3, 0, 0);
+                const m3 = new THREE.Mesh(GEOS.sphere, neonMat); m3.scale.set(w*0.2, w*0.2, d*0.2); m3.position.set(-w*0.3, isTop ? -h/4 : h/4, 0);
+                group.add(m1, m2, m3);
+            }
+            else if (theme.env === 'clouds') { 
+                m1 = new THREE.Mesh(GEOS.cyl, baseMat); m1.scale.set(w*0.4, h, d*0.4);
+                m2 = new THREE.Mesh(GEOS.cyl, getMat(theme.pipe, 0x000000, true)); m2.scale.set(w*0.45, h, d*0.45);
+                const cap = new THREE.Mesh(GEOS.box, neonMat); cap.scale.set(w*0.8, 1, d*0.8); cap.position.y = isTop ? -h/2 + 0.5 : h/2 - 0.5;
+                group.add(m1, m2, cap);
+            }
+            else if (theme.env === 'cyber') {
+                m1 = new THREE.Mesh(GEOS.box, getMat(0x111111)); m1.scale.set(w*0.8, h, d*0.8);
+                m2 = new THREE.Mesh(GEOS.box, neonMat); m2.scale.set(w, h*1.01, d); m2.material.wireframe = true;
+                group.add(m1, m2);
+            }
+            else if (theme.env === 'space') {
+                m1 = new THREE.Mesh(GEOS.cyl, baseMat); m1.scale.set(w*0.6, h, d*0.6);
+                for(let y=-h/2+2; y<h/2; y+=5) { let ring = new THREE.Mesh(GEOS.torus, neonMat); ring.scale.set(w*0.8, w*0.8, d*0.8); ring.position.y = y; ring.rotation.x = Math.PI/2; group.add(ring); }
+                group.add(m1);
+            }
+            else if (theme.env === 'dino') { 
+                m1 = new THREE.Mesh(GEOS.cyl, baseMat); m1.scale.set(w*0.4, h, d*0.4);
+                m2 = new THREE.Mesh(GEOS.sphere, baseMat); m2.scale.set(w*0.6, w*0.6, d*0.6); m2.position.set(w*0.3, isTop ? -h/2 : h/2, 0);
+                const m3 = new THREE.Mesh(GEOS.sphere, baseMat); m3.scale.set(w*0.6, w*0.6, d*0.6); m3.position.set(-w*0.3, isTop ? -h/2 : h/2, 0);
+                group.add(m1, m2, m3);
+            }
+            else if (theme.env === 'infinity') {
+                m1 = new THREE.Mesh(GEOS.box, baseMat); m1.scale.set(w*0.5, h, d*0.5);
+                m2 = new THREE.Mesh(GEOS.box, neonMat); m2.scale.set(w*0.8, h*1.05, d*0.8); m2.material.wireframe = true; m2.userData.isRotator = true; 
+                group.add(m1, m2);
+            }
+            else { 
+                m1 = new THREE.Mesh(GEOS.box, baseMat); m1.scale.set(w, h, d);
+                m2 = new THREE.Mesh(GEOS.box, neonMat); m2.scale.set(w+0.5, 1, d+0.5); m2.position.y = isTop ? -h/2 + 0.5 : h/2 - 0.5;
+                group.add(m1, m2);
+            }
+
+            group.children.forEach(c => { c.castShadow = true; c.receiveShadow = true; });
+        };
+
         const spawnObstacle = () => {
             const gapSize = DIFFICULTIES[activeDiff].gap;
             const gapY = Math.random() * 13 - 1;
             const theme = THEMES[Math.min(currentLevel, MAX_THEME_LEVEL)] || THEMES[0];
 
-            const pipeW = 3, pipeH = 40;
+            const pipeW = 3, pipeH = 40, pipeD = 4;
             const group = new THREE.Group();
             group.position.set(30, 0, 0); group.passed = false; group.gapY = gapY;
 
-            const mat = getMat(theme.pipe);
-            const neonMat = getMat(theme.neon, theme.neon);
+            // Physics Hitboxes (Invisible)
+            const topHitbox = new THREE.Mesh(GEOS.invisible, MATS.invisible); topHitbox.scale.set(pipeW, pipeH, pipeD); topHitbox.position.y = gapY + (gapSize/2) + (pipeH/2);
+            const botHitbox = new THREE.Mesh(GEOS.invisible, MATS.invisible); botHitbox.scale.set(pipeW, pipeH, pipeD); botHitbox.position.y = gapY - (gapSize/2) - (pipeH/2);
+            group.add(topHitbox, botHitbox);
 
-            // Top Pipe
-            const topMesh = new THREE.Mesh(GEOS.box, mat);
-            topMesh.scale.set(pipeW, pipeH, 4);
-            topMesh.position.y = gapY + (gapSize/2) + (pipeH/2);
-            topMesh.castShadow = true; topMesh.receiveShadow = true;
-            
-            const topLip = new THREE.Mesh(GEOS.box, neonMat);
-            topLip.scale.set(pipeW+0.5, 1, 4.5);
-            topLip.position.y = gapY + (gapSize/2) + 0.5;
-
-            // Bot Pipe
-            const botMesh = new THREE.Mesh(GEOS.box, mat);
-            botMesh.scale.set(pipeW, pipeH, 4);
-            botMesh.position.y = gapY - (gapSize/2) - (pipeH/2);
-            botMesh.castShadow = true; botMesh.receiveShadow = true;
-
-            const botLip = new THREE.Mesh(GEOS.box, neonMat);
-            botLip.scale.set(pipeW+0.5, 1, 4.5);
-            botLip.position.y = gapY - (gapSize/2) - 0.5;
+            // Visual Groups
+            const topVis = new THREE.Group(); topVis.position.copy(topHitbox.position);
+            const botVis = new THREE.Group(); botVis.position.copy(botHitbox.position);
+            buildThematicObstacle(topVis, theme, pipeW, pipeH, pipeD, true); 
+            buildThematicObstacle(botVis, theme, pipeW, pipeH, pipeD, false);
+            group.add(topVis, botVis);
 
             const coin = new THREE.Mesh(GEOS.coin, MATS.coin);
             coin.position.set(0, gapY, 0);
+            group.add(coin);
 
-            group.add(topMesh, topLip, botMesh, botLip, coin);
             scene.add(group);
             
             const boxTop = new THREE.Box3(); const boxBot = new THREE.Box3();
-            obstacles.push({ group, boxTop, boxBot, topMesh, botMesh, coin, coinCollected: false });
+            obstacles.push({ group, boxTop, boxBot, topHitbox, botHitbox, topVis, botVis, coin, coinCollected: false });
         };
 
         const triggerDeath = () => {
@@ -345,7 +423,11 @@ export default function App() {
                     let obs = obstacles[i]; obs.group.position.x -= GAME_SPEED;
                     if(obs.coin) obs.coin.rotation.y += 0.05;
 
-                    obs.boxTop.setFromObject(obs.topMesh); obs.boxBot.setFromObject(obs.botMesh);
+                    // Apply thematic rotations
+                    obs.topVis.children.forEach(c => { if(c.userData.isRotator) { c.rotation.x+=0.02; c.rotation.y+=0.02; } });
+                    obs.botVis.children.forEach(c => { if(c.userData.isRotator) { c.rotation.x-=0.02; c.rotation.y-=0.02; } });
+
+                    obs.boxTop.setFromObject(obs.topHitbox); obs.boxBot.setFromObject(obs.botHitbox);
                     obs.boxTop.expandByScalar(-0.2); obs.boxBot.expandByScalar(-0.2);
 
                     if (obs.boxTop.intersectsSphere(pSphere) || obs.boxBot.intersectsSphere(pSphere)) triggerDeath();
