@@ -188,7 +188,19 @@ export default function App() {
         let accumulator = 0;
         const FIXED_DT = 1000 / 60; // 60hz physics locked
 
-        // Cache Geometries
+        // Input
+        let mouseX = 0, mouseY = 0;
+
+        const handleOrientation = (e) => {
+            if (e.gamma == null || e.beta == null) return;
+            // Gamma: left-to-right tilt. Beta: front-to-back tilt.
+            let x = e.gamma / 45; 
+            let y = (e.beta - 45) / 45; 
+            mouseX = Math.max(-1, Math.min(1, x));
+            mouseY = Math.max(-1, Math.min(1, -y));
+        };
+
+        // --- CACHED 3D ASSETS ---
         const GEOS = {
             box: new THREE.BoxGeometry(1, 1, 1),
             sphere: new THREE.SphereGeometry(1, 16, 16),
@@ -511,6 +523,7 @@ export default function App() {
         const renderLoop = (time) => {
             requestAnimationFrame(renderLoop);
 
+            if (!time) time = performance.now();
             let dt = time - lastTime;
             lastTime = time;
             if (dt > 250) dt = 250; 
@@ -522,14 +535,25 @@ export default function App() {
                 accumulator -= FIXED_DT;
             }
 
-            let targetFov = 60 + Math.min(combo * 2, 30);
+            // Adaptive Mobile Viewport - widen FOV on narrow screens
+            let aspect = window.innerWidth / window.innerHeight;
+            let baseFov = aspect < 1 ? 60 + (1 - aspect) * 20 : 60;
+            let targetFov = baseFov + Math.min(combo * 2, 30);
             camera.fov += (targetFov - camera.fov) * 0.1;
             camera.updateProjectionMatrix();
 
-            let targetX = 0; let targetY = 5;
-            if(screenShake > 0) { targetX += (Math.random()-0.5) * screenShake * 0.1; targetY += (Math.random()-0.5) * screenShake * 0.1; screenShake--; }
+            let targetX = mouseX * 5; 
+            let targetY = 5 + mouseY * 3;
+            let targetZ = aspect < 1 ? 25 + (1 - aspect) * 15 : 25; // Pull camera back in portrait
+
+            if(screenShake > 0) { 
+                targetX += (Math.random()-0.5) * screenShake * 0.1; 
+                targetY += (Math.random()-0.5) * screenShake * 0.1; 
+                screenShake--; 
+            }
             camera.position.x += (targetX - camera.position.x) * 0.1; 
             camera.position.y += (targetY - camera.position.y) * 0.1; 
+            camera.position.z += (targetZ - camera.position.z) * 0.1; 
             camera.lookAt(0, 5, 0);
 
             renderer.render(scene, camera);
@@ -546,6 +570,19 @@ export default function App() {
         engineRef.current = {
             setTheme: update3DTheme,
             setHero: (id) => { activeHero = id; buildPlayerMesh(id); },
+            enableGyro: () => {
+                if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                    if (!window.hasRequestedGyro) {
+                        window.hasRequestedGyro = true;
+                        DeviceOrientationEvent.requestPermission().then(state => {
+                            if (state === 'granted') window.addEventListener('deviceorientation', handleOrientation);
+                        }).catch(console.error);
+                    }
+                } else if (!window.hasRequestedGyro) {
+                    window.hasRequestedGyro = true;
+                    window.addEventListener('deviceorientation', handleOrientation);
+                }
+            },
             jump: () => {
                 if (internalState === 'PLAYING' && hitPauseTimer <= 0) {
                     playerVelocityY = DIFFICULTIES[activeDiff].jump;
@@ -574,7 +611,7 @@ export default function App() {
                 showDOMMsg(currentLevel > MAX_THEME_LEVEL ? `CHECKPOINT ${currentLevel}` : THEMES[Math.min(currentLevel, MAX_THEME_LEVEL)].name, THEMES[Math.min(currentLevel, MAX_THEME_LEVEL)].neon);
             },
             onGameOver: (finalGlobal, finalRun) => {
-                setGameState('GAMEOVER');
+                internalState = 'GAMEOVER';
                 engineRef.current.lastScores = { finalGlobal, finalRun, lvl: currentLevel };
             }
         };
@@ -583,14 +620,11 @@ export default function App() {
     // --- Input Handling ---
     useEffect(() => {
         const handleInteraction = (e) => {
-            // CRITICAL FIX: Only jump / intercept screen touches when we are actively PLAYING.
-            // This re-enables normal mobile scrolling inside the UI menus!
             if (gameState !== 'PLAYING') return;
 
             if(e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT' || e.target.closest('button')) return;
             if(e.type === 'keydown' && e.code !== 'Space') return;
             
-            // Stop mobile zoom, but allow standard click flow if needed elsewhere
             if(e.cancelable && e.type !== 'mousedown') e.preventDefault(); 
             
             if(window.audioCtxInstance && window.audioCtxInstance.state === 'suspended') window.audioCtxInstance.resume();
@@ -610,39 +644,43 @@ export default function App() {
 
     // Handle Game Over Logic from Engine
     useEffect(() => {
-        if(gameState === 'GAMEOVER' && engineRef.current && engineRef.current.lastScores) {
-            const { finalGlobal, finalRun, lvl } = engineRef.current.lastScores;
-            
-            let newProfile = {...profile};
-            newProfile.totalRuns += 1;
-            newProfile.totalScore += finalRun;
-            if (!newProfile.heroPlays) newProfile.heroPlays = {};
-            
-            if(finalGlobal > newProfile.highScores[currentDiff]) {
-                newProfile.highScores[currentDiff] = finalGlobal;
+        const checkGameOver = setInterval(() => {
+            if(engineRef.current && engineRef.current.lastScores && gameState === 'PLAYING') {
+                const { finalGlobal, finalRun, lvl } = engineRef.current.lastScores;
+                engineRef.current.lastScores = null; // Clear flag
+                
+                let newProfile = {...profile};
+                newProfile.totalRuns += 1;
+                newProfile.totalScore += finalRun;
+                if (!newProfile.heroPlays) newProfile.heroPlays = {};
+                
+                if(finalGlobal > newProfile.highScores[currentDiff]) {
+                    newProfile.highScores[currentDiff] = finalGlobal;
+                }
+                if(finalRun > (newProfile.levelHighScores[currentDiff][lvl] || 0)) {
+                    newProfile.levelHighScores[currentDiff][lvl] = finalRun;
+                }
+                
+                let newUnlocked = [...(newProfile.unlockedLevels[currentDiff] || [0])];
+                for (let i = 0; i <= lvl; i++) {
+                    if (!newUnlocked.includes(i)) newUnlocked.push(i);
+                }
+                newProfile.unlockedLevels[currentDiff] = newUnlocked;
+                
+                saveProfile(newProfile);
+                setGameState('GAMEOVER');
+                
+                const gBest = Math.max(newProfile.highScores.easy, newProfile.highScores.medium, newProfile.highScores.hard);
+                const unlocked = CHARACTERS.filter(c => c.req > (gBest - finalRun) && c.req <= gBest && c.req > 0);
+                
+                if(unlocked.length > 0) {
+                    setRecentlyUnlocked(unlocked);
+                    setTimeout(() => setGameState('UNLOCK'), 500);
+                }
             }
-            if(finalRun > (newProfile.levelHighScores[currentDiff][lvl] || 0)) {
-                newProfile.levelHighScores[currentDiff][lvl] = finalRun;
-            }
-            
-            // Save newly reached levels/checkpoints
-            let newUnlocked = [...(newProfile.unlockedLevels[currentDiff] || [0])];
-            for (let i = 0; i <= lvl; i++) {
-                if (!newUnlocked.includes(i)) newUnlocked.push(i);
-            }
-            newProfile.unlockedLevels[currentDiff] = newUnlocked;
-            
-            saveProfile(newProfile);
-            
-            const gBest = Math.max(newProfile.highScores.easy, newProfile.highScores.medium, newProfile.highScores.hard);
-            const unlocked = CHARACTERS.filter(c => c.req > (gBest - finalRun) && c.req <= gBest && c.req > 0);
-            
-            if(unlocked.length > 0) {
-                setRecentlyUnlocked(unlocked);
-                setTimeout(() => setGameState('UNLOCK'), 500);
-            }
-        }
-    }, [gameState]);
+        }, 100);
+        return () => clearInterval(checkGameOver);
+    }, [gameState, profile, currentDiff]);
 
     // Sync 3D background theme when changing checkpoints in the menu
     useEffect(() => {
@@ -653,8 +691,12 @@ export default function App() {
 
     // --- UI Render ---
     const startGame = () => {
+        const startLvl = Math.max(...(profile.unlockedLevels[currentDiff] || [0]));
         setGameState('PLAYING');
-        engineRef.current.start(selectedStartLevel, currentDiff, selectedHeroId);
+        if (engineRef.current) {
+            engineRef.current.enableGyro();
+            engineRef.current.start(startLvl, currentDiff, selectedHeroId);
+        }
     };
 
     const confirmName = () => {
@@ -663,7 +705,7 @@ export default function App() {
         setGameState('START');
         if(engineRef.current) {
             engineRef.current.setHero(selectedHeroId);
-            engineRef.current.setTheme(selectedStartLevel);
+            engineRef.current.setTheme(Math.max(...(profile.unlockedLevels[currentDiff] || [0])));
         }
     };
 
