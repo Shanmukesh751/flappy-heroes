@@ -60,10 +60,11 @@ export default function App() {
     
     // React State
     const [engineLoaded, setEngineLoaded] = useState(false);
-    const [gameState, setGameState] = useState('NAME'); // NAME, START, PLAYING, GAMEOVER, UNLOCK
+    const [gameState, setGameState] = useState('NAME'); // NAME, START, PLAYING, GAMEOVER, UNLOCK, LEADERBOARD, STATS
     
     const [soundEnabled, setSoundEnabled] = useState(true);
     const soundEnabledRef = useRef(true);
+    const [hideWarning, setHideWarning] = useState(false); // Used to dismiss orientation warning on mobile
 
     const [playerName, setPlayerName] = useState("");
     
@@ -75,7 +76,7 @@ export default function App() {
         name: "", highScores: { easy: 0, medium: 0, hard: 0 },
         levelHighScores: { easy: {}, medium: {}, hard: {} },
         unlockedLevels: { easy: [0], medium: [0], hard: [0] },
-        totalRuns: 0, totalScore: 0
+        totalRuns: 0, totalScore: 0, heroPlays: {}
     });
 
     // Refs for DOM nodes to bypass React renders for 60fps performance
@@ -102,6 +103,7 @@ export default function App() {
         if (stored) {
             try { 
                 const p = {...profile, ...JSON.parse(stored)};
+                if (!p.heroPlays) p.heroPlays = {}; // Migration safety
                 setProfile(p);
                 setPlayerName(p.name);
                 if (p.name) setGameState('START');
@@ -423,7 +425,6 @@ export default function App() {
                     let obs = obstacles[i]; obs.group.position.x -= GAME_SPEED;
                     if(obs.coin) obs.coin.rotation.y += 0.05;
 
-                    // Apply thematic rotations
                     obs.topVis.children.forEach(c => { if(c.userData.isRotator) { c.rotation.x+=0.02; c.rotation.y+=0.02; } });
                     obs.botVis.children.forEach(c => { if(c.userData.isRotator) { c.rotation.x-=0.02; c.rotation.y-=0.02; } });
 
@@ -467,7 +468,6 @@ export default function App() {
         const renderLoop = (time) => {
             requestAnimationFrame(renderLoop);
 
-            // Jitter-free fixed timestep
             let dt = time - lastTime;
             lastTime = time;
             if (dt > 250) dt = 250; 
@@ -479,7 +479,6 @@ export default function App() {
                 accumulator -= FIXED_DT;
             }
 
-            // Camera Parallax & Shake
             let targetFov = 60 + Math.min(combo * 2, 30);
             camera.fov += (targetFov - camera.fov) * 0.1;
             camera.updateProjectionMatrix();
@@ -493,17 +492,14 @@ export default function App() {
             renderer.render(scene, camera);
         };
 
-        // Resize handler
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
         });
 
-        // Start Loop
         requestAnimationFrame(renderLoop);
 
-        // Expose controls to React
         engineRef.current = {
             setTheme: update3DTheme,
             setHero: (id) => { activeHero = id; buildPlayerMesh(id); },
@@ -535,58 +531,26 @@ export default function App() {
             },
             onGameOver: (finalGlobal, finalRun) => {
                 setGameState('GAMEOVER');
-                // The React component will handle score saving to avoid closure stale state
                 engineRef.current.lastScores = { finalGlobal, finalRun, lvl: currentLevel };
             }
         };
     };
 
-    // --- Audio Bridge ---
-    const playAudio = (type, pitchOffset = 0) => {
-        if (!soundEnabledRef.current || (!window.AudioContext && !window.webkitAudioContext)) return;
-        if (!window.audioCtxInstance) window.audioCtxInstance = new (window.AudioContext || window.webkitAudioContext)();
-        const ctx = window.audioCtxInstance;
-        if (ctx.state === 'suspended') ctx.resume();
-        const now = ctx.currentTime;
-        const osc = ctx.createOscillator(); const gain = ctx.createGain();
-        osc.connect(gain); gain.connect(ctx.destination);
-
-        if(type === 'jump') {
-            osc.type = 'sine'; osc.frequency.setValueAtTime(300 + pitchOffset, now); osc.frequency.exponentialRampToValueAtTime(600, now + 0.1);
-            gain.gain.setValueAtTime(0.1, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
-            osc.start(now); osc.stop(now + 0.1);
-        } else if(type === 'score') {
-            osc.type = 'square'; osc.frequency.setValueAtTime(800 + pitchOffset, now); osc.frequency.setValueAtTime(1200, now + 0.05);
-            gain.gain.setValueAtTime(0.05, now); gain.gain.linearRampToValueAtTime(0, now + 0.1);
-            osc.start(now); osc.stop(now + 0.1);
-        } else if(type === 'coin') { 
-            osc.type = 'sine'; osc.frequency.setValueAtTime(1200 + pitchOffset, now); osc.frequency.exponentialRampToValueAtTime(2400 + pitchOffset, now + 0.15);
-            gain.gain.setValueAtTime(0.15, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
-            osc.start(now); osc.stop(now + 0.2);
-        } else if(type === 'crash') {
-            osc.type = 'sawtooth'; osc.frequency.setValueAtTime(150, now); osc.frequency.exponentialRampToValueAtTime(10, now + 0.4);
-            gain.gain.setValueAtTime(0.3, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
-            osc.start(now); osc.stop(now + 0.4);
-        } else if(type === 'milestone') {
-            [523.25, 659.25, 783.99, 1046.50].forEach((freq, i) => {
-                const o = ctx.createOscillator(); const g = ctx.createGain();
-                o.connect(g); g.connect(ctx.destination);
-                o.type = 'sine'; o.frequency.value = freq;
-                g.gain.setValueAtTime(0.15, now + i*0.08); g.gain.linearRampToValueAtTime(0, now + i*0.08 + 0.15);
-                o.start(now + i*0.08); o.stop(now + i*0.08 + 0.15);
-            });
-        }
-    };
-
     // --- Input Handling ---
     useEffect(() => {
         const handleInteraction = (e) => {
+            // CRITICAL FIX: Only jump / intercept screen touches when we are actively PLAYING.
+            // This re-enables normal mobile scrolling inside the UI menus!
+            if (gameState !== 'PLAYING') return;
+
             if(e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT' || e.target.closest('button')) return;
             if(e.type === 'keydown' && e.code !== 'Space') return;
-            if(e.type !== 'mousedown') e.preventDefault(); // Stop zoom
+            
+            // Stop mobile zoom, but allow standard click flow if needed elsewhere
+            if(e.cancelable && e.type !== 'mousedown') e.preventDefault(); 
             
             if(window.audioCtxInstance && window.audioCtxInstance.state === 'suspended') window.audioCtxInstance.resume();
-            if (engineRef.current && gameState === 'PLAYING') engineRef.current.jump();
+            if (engineRef.current) engineRef.current.jump();
         };
 
         window.addEventListener('keydown', handleInteraction);
@@ -608,6 +572,7 @@ export default function App() {
             let newProfile = {...profile};
             newProfile.totalRuns += 1;
             newProfile.totalScore += finalRun;
+            if (!newProfile.heroPlays) newProfile.heroPlays = {};
             
             if(finalGlobal > newProfile.highScores[currentDiff]) {
                 newProfile.highScores[currentDiff] = finalGlobal;
@@ -687,6 +652,16 @@ export default function App() {
                     {/* Floating DOM Message */}
                     <div ref={msgRef} className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 text-4xl font-black uppercase tracking-widest text-center pointer-events-none opacity-0 transition-opacity duration-200 z-50 drop-shadow-[0_4px_10px_rgba(0,0,0,0.8)]" />
 
+                    {/* Orientation Warning Overlay */}
+                    {!hideWarning && (
+                        <div className="orientation-warning-overlay">
+                            <div className="text-6xl mb-4 animate-[rotatePhone_2s_infinite_ease-in-out]">📱</div>
+                            <h2 className="text-3xl font-black text-cyan-400 mb-2 uppercase tracking-widest">Rotate Device</h2>
+                            <p className="text-lg text-gray-300 mb-8 mx-4">For the best experience, please play in portrait mode.</p>
+                            <button onClick={() => setHideWarning(true)} className="px-8 py-3 border-2 border-gray-500 text-gray-300 font-bold rounded-xl hover:bg-gray-800 transition-all pointer-events-auto">I know, let me play!</button>
+                        </div>
+                    )}
+
                     {/* Screens Overlay */}
                     <div className="absolute inset-0 z-30 flex items-center justify-center pointer-events-none p-4">
                         
@@ -732,7 +707,7 @@ export default function App() {
                                     </div>
                                     <div className="text-right">
                                         <div className="text-xs text-gray-400 uppercase tracking-wider font-bold mb-1">Sector Best</div>
-                                        <div className="text-xl font-black text-yellow-400">{profile.levelHighScores[currentDiff][startLvl] || 0}</div>
+                                        <div className="text-xl font-black text-yellow-400">{profile.levelHighScores[currentDiff]?.[startLvl] || 0}</div>
                                     </div>
                                 </div>
 
@@ -748,8 +723,8 @@ export default function App() {
                                                 onClick={() => { setSelectedHeroId(char.id); engineRef.current.setHero(char.id); }}
                                                 className={`relative flex flex-col items-center justify-center p-2 rounded-xl transition-all border-2
                                                     ${isLocked ? 'bg-black/60 border-gray-800 opacity-50 cursor-not-allowed' : 
-                                                    isSelected ? 'bg-yellow-500/10 border-yellow-400 shadow-[0_0_15px_rgba(250,204,21,0.3)] scale-105 z-10' : 
-                                                    'bg-slate-800/60 border-slate-600 hover:border-cyan-400 hover:bg-cyan-500/10'}`}
+                                                      isSelected ? 'bg-yellow-500/10 border-yellow-400 shadow-[0_0_15px_rgba(250,204,21,0.3)] scale-105 z-10' : 
+                                                      'bg-slate-800/60 border-slate-600 hover:border-cyan-400 hover:bg-cyan-500/10'}`}
                                             >
                                                 <div className="w-10 h-10 mb-1 rounded-lg flex items-center justify-center" style={{ background: `radial-gradient(circle, ${char.c1}, ${char.c2})`, border: '1px solid rgba(255,255,255,0.2)' }}>
                                                     <IconTag className="w-6 h-6 text-white drop-shadow-md" />
@@ -764,6 +739,11 @@ export default function App() {
                                 <button onClick={startGame} className="w-full py-4 text-xl font-black uppercase tracking-widest text-black bg-cyan-400 rounded-xl hover:bg-cyan-300 hover:shadow-[0_0_20px_rgba(0,255,255,0.6)] hover:scale-105 transition-all mb-4">
                                     Launch Mission
                                 </button>
+                                
+                                <div className="flex gap-2 sm:gap-4 w-full">
+                                    <button onClick={() => setGameState('LEADERBOARD')} className="flex-1 py-3 bg-slate-800 border border-slate-600 text-gray-300 font-bold rounded-xl hover:bg-slate-700 hover:text-white transition-all">Network</button>
+                                    <button onClick={() => setGameState('STATS')} className="flex-1 py-3 bg-slate-800 border border-slate-600 text-gray-300 font-bold rounded-xl hover:bg-slate-700 hover:text-white transition-all">Stats</button>
+                                </div>
                             </div>
                         )}
 
@@ -778,14 +758,61 @@ export default function App() {
                                     <div className="text-5xl font-black text-white">{engineRef.current?.lastScores?.finalGlobal || 0}</div>
                                 </div>
 
-                                <div className="flex gap-3 w-full">
-                                    <button onClick={startGame} className="flex-1 flex items-center justify-center gap-2 py-3 bg-red-500/20 border border-red-500 text-red-400 font-bold rounded-xl hover:bg-red-500 hover:text-black transition-all">
+                                <div className="flex gap-3 w-full flex-wrap">
+                                    <button onClick={startGame} className="flex-1 flex min-w-[140px] items-center justify-center gap-2 py-3 bg-red-500/20 border border-red-500 text-red-400 font-bold rounded-xl hover:bg-red-500 hover:text-black transition-all">
                                         <RotateCcw className="w-5 h-5" /> Reboot
                                     </button>
-                                    <button onClick={()=>setGameState('START')} className="flex-1 py-3 bg-slate-800 border border-slate-600 text-gray-300 font-bold rounded-xl hover:bg-slate-700 hover:text-white transition-all">
+                                    <button onClick={() => {
+                                        const text = `Flappy 3D\nAgent: ${profile.name}\nDiff: ${DIFFICULTIES[currentDiff].label}\nScore: ${engineRef.current?.lastScores?.finalGlobal || 0}\nHero: ${CHARACTERS[selectedHeroId]?.name || 'Orb'}`;
+                                        if (navigator.share) navigator.share({ text }); else { navigator.clipboard.writeText(text); alert("Copied!"); }
+                                    }} className="flex-1 min-w-[100px] flex items-center justify-center gap-2 py-3 bg-transparent border border-cyan-500 text-cyan-400 font-bold rounded-xl hover:bg-cyan-500/20 transition-all">
+                                        <Share2 className="w-5 h-5" /> Share
+                                    </button>
+                                    <button onClick={()=>setGameState('START')} className="w-full py-3 bg-slate-800 border border-slate-600 text-gray-300 font-bold rounded-xl hover:bg-slate-700 hover:text-white transition-all">
                                         Menu
                                     </button>
                                 </div>
+                            </div>
+                        )}
+
+                        {/* LEADERBOARD */}
+                        {gameState === 'LEADERBOARD' && (
+                            <div className="bg-slate-900/90 border border-cyan-500/30 p-6 rounded-2xl shadow-2xl backdrop-blur-md pointer-events-auto flex flex-col items-center w-full max-w-sm animate-in zoom-in duration-300">
+                                <h1 className="text-2xl font-black text-cyan-400 uppercase tracking-widest mb-4 drop-shadow-[0_0_10px_rgba(0,255,255,0.5)]">Global Network</h1>
+                                <div className="w-full bg-black/40 border border-white/10 rounded-xl p-2 mb-4 max-h-[40vh] overflow-y-auto custom-scrollbar text-left">
+                                    {(() => {
+                                        const lb = JSON.parse(localStorage.getItem('fh3d_leaderboard_v4') || '[]');
+                                        if(lb.length === 0) return <div className="text-center text-gray-500 p-4">No records yet.</div>;
+                                        return lb.map((entry, i) => (
+                                            <div key={i} className="flex justify-between p-2 border-b border-white/5 last:border-0 text-sm">
+                                                <span>#{i+1} <strong className="text-cyan-400 ml-1">{entry.name}</strong></span>
+                                                <span className="text-gray-300">{entry.score} <span className="text-xs opacity-50">[{entry.diff}]</span></span>
+                                            </div>
+                                        ));
+                                    })()}
+                                </div>
+                                <button onClick={() => setGameState('START')} className="w-full py-3 bg-slate-800 border border-slate-600 text-gray-300 font-bold rounded-xl hover:bg-slate-700 hover:text-white transition-all">Close</button>
+                            </div>
+                        )}
+
+                        {/* STATS */}
+                        {gameState === 'STATS' && (
+                            <div className="bg-slate-900/90 border border-cyan-500/30 p-6 rounded-2xl shadow-2xl backdrop-blur-md pointer-events-auto flex flex-col items-center w-full max-w-sm animate-in zoom-in duration-300">
+                                <h1 className="text-2xl font-black text-cyan-400 uppercase tracking-widest mb-4 drop-shadow-[0_0_10px_rgba(0,255,255,0.5)]">Telemetry Data</h1>
+                                <div className="w-full bg-black/40 border border-white/10 rounded-xl p-4 mb-4 text-left flex flex-col gap-3">
+                                    <div className="flex justify-between border-b border-white/5 pb-2"><span>Designation:</span><strong className="text-cyan-400">{profile.name || 'Unknown'}</strong></div>
+                                    <div className="flex justify-between border-b border-white/5 pb-2"><span>Missions Run:</span><strong>{profile.totalRuns}</strong></div>
+                                    <div className="flex justify-between border-b border-white/5 pb-2"><span>Total Points:</span><strong>{profile.totalScore}</strong></div>
+                                    <div className="flex justify-between border-b border-white/5 pb-2"><span>Max Depth:</span><strong>{Math.max(...(profile.unlockedLevels.easy||[0]), ...(profile.unlockedLevels.medium||[0]), ...(profile.unlockedLevels.hard||[0]))}</strong></div>
+                                    <div className="flex justify-between"><span>Primary Asset:</span><strong className="text-yellow-400">{
+                                        (() => {
+                                            let fav = 'Orb', maxPlays = 0;
+                                            for(let id in profile.heroPlays) { if(profile.heroPlays[id] > maxPlays) { maxPlays = profile.heroPlays[id]; fav = (CHARACTERS.find(c=>c.id==parseInt(id))||{}).name || fav; } }
+                                            return fav;
+                                        })()
+                                    }</strong></div>
+                                </div>
+                                <button onClick={() => setGameState('START')} className="w-full py-3 bg-slate-800 border border-slate-600 text-gray-300 font-bold rounded-xl hover:bg-slate-700 hover:text-white transition-all">Close</button>
                             </div>
                         )}
 
@@ -825,6 +852,8 @@ export default function App() {
                 .custom-scrollbar::-webkit-scrollbar { width: 6px; }
                 .custom-scrollbar::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); border-radius: 10px; }
                 .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(0,255,255,0.3); border-radius: 10px; }
+                .orientation-warning-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(5, 5, 16, 0.98); color: white; z-index: 9999; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+                @media (max-width: 900px) and (max-height: 500px) and (orientation: landscape) { .orientation-warning-overlay { display: flex; } }
             `}} />
         </div>
     );
