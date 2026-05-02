@@ -16,7 +16,7 @@ jobs:
           node-version: 18
       - run: npm install
       - run: npm run build
-      - uses: actions/upload-pages-artifact@v2
+      - uses: actions/upload-pages-artifact@v3
         with:
           path: ./dist
   deploy:
@@ -27,4 +27,4 @@ jobs:
     needs: build
     steps:
       - id: deployment
-        uses: actions/deploy-pages@v2
+        uses: actions/deploy-pages@v4
