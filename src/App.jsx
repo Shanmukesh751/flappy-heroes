@@ -7,7 +7,7 @@ import {
 
 // ==========================================
 // 🔥 DEVELOPER MODE FLAG 🔥
-const DEV_MODE_ALL_UNLOCKED = true;
+const DEV_MODE_ALL_UNLOCKED = false;
 // ==========================================
 
 const MAX_THEME_LEVEL = 11;
@@ -69,6 +69,7 @@ export default function App() {
     const [playerName, setPlayerName] = useState("");
     
     const [currentDiff, setCurrentDiff] = useState('medium');
+    const [selectedStartLevel, setSelectedStartLevel] = useState(0);
     const [selectedHeroId, setSelectedHeroId] = useState(0);
     const [recentlyUnlocked, setRecentlyUnlocked] = useState([]);
     
@@ -106,6 +107,7 @@ export default function App() {
                 if (!p.heroPlays) p.heroPlays = {}; // Migration safety
                 setProfile(p);
                 setPlayerName(p.name);
+                setSelectedStartLevel(Math.max(...(p.unlockedLevels['medium'] || [0])));
                 if (p.name) setGameState('START');
             } catch(e){}
         }
@@ -174,6 +176,7 @@ export default function App() {
         let obstacles = [];
         let particles = [];
         let frames = 0, currentLevel = 0, runScore = 0, globalScore = 0, combo = 0;
+        let nextLevelThreshold = 10;
         let playerVelocityY = 0;
         let hitPauseTimer = 0, deathTimer = 0, screenShake = 0;
         let internalState = 'MENU';
@@ -199,6 +202,42 @@ export default function App() {
         const MATS = { 
             coin: new THREE.MeshStandardMaterial({ color: 0xffd700, emissive: 0xffaa00, roughness: 0.2, metalness: 0.8 }),
             invisible: new THREE.MeshBasicMaterial({ visible: false }) 
+        };
+
+        const playAudio = (type, pitchOffset = 0) => {
+            if (!soundEnabledRef.current || (!window.AudioContext && !window.webkitAudioContext)) return;
+            if (!window.audioCtxInstance) window.audioCtxInstance = new (window.AudioContext || window.webkitAudioContext)();
+            const ctx = window.audioCtxInstance;
+            if (ctx.state === 'suspended') ctx.resume();
+            const now = ctx.currentTime;
+            const osc = ctx.createOscillator(); const gain = ctx.createGain();
+            osc.connect(gain); gain.connect(ctx.destination);
+
+            if(type === 'jump') {
+                osc.type = 'sine'; osc.frequency.setValueAtTime(300 + pitchOffset, now); osc.frequency.exponentialRampToValueAtTime(600, now + 0.1);
+                gain.gain.setValueAtTime(0.1, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+                osc.start(now); osc.stop(now + 0.1);
+            } else if(type === 'score') {
+                osc.type = 'square'; osc.frequency.setValueAtTime(800 + pitchOffset, now); osc.frequency.setValueAtTime(1200, now + 0.05);
+                gain.gain.setValueAtTime(0.05, now); gain.gain.linearRampToValueAtTime(0, now + 0.1);
+                osc.start(now); osc.stop(now + 0.1);
+            } else if(type === 'coin') { 
+                osc.type = 'sine'; osc.frequency.setValueAtTime(1200 + pitchOffset, now); osc.frequency.exponentialRampToValueAtTime(2400 + pitchOffset, now + 0.15);
+                gain.gain.setValueAtTime(0.15, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+                osc.start(now); osc.stop(now + 0.2);
+            } else if(type === 'crash') {
+                osc.type = 'sawtooth'; osc.frequency.setValueAtTime(150, now); osc.frequency.exponentialRampToValueAtTime(10, now + 0.4);
+                gain.gain.setValueAtTime(0.3, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+                osc.start(now); osc.stop(now + 0.4);
+            } else if(type === 'milestone') {
+                [523.25, 659.25, 783.99, 1046.50].forEach((freq, i) => {
+                    const o = ctx.createOscillator(); const g = ctx.createGain();
+                    o.connect(g); g.connect(ctx.destination);
+                    o.type = 'sine'; o.frequency.value = freq;
+                    g.gain.setValueAtTime(0.15, now + i*0.08); g.gain.linearRampToValueAtTime(0, now + i*0.08 + 0.15);
+                    o.start(now + i*0.08); o.stop(now + i*0.08 + 0.15);
+                });
+            }
         };
 
         function getMat(colorHex, emissiveHex = 0x000000, wireframe = false) {
@@ -455,12 +494,16 @@ export default function App() {
                             if(scoreRef.current) scoreRef.current.innerText = globalScore;
                             if(comboRef.current) comboRef.current.innerText = combo + "x";
                         }
-                        let thresh = (currentLevel >= MAX_THEME_LEVEL) ? 20 : 10;
-                        if (runScore > 0 && runScore % thresh === 0) levelUp();
                     }
 
                     if (obs.group.position.x < -20) { scene.remove(obs.group); obstacles.splice(i, 1); }
                 }
+
+                if (runScore >= nextLevelThreshold) {
+                    levelUp();
+                    nextLevelThreshold += (currentLevel >= MAX_THEME_LEVEL) ? 20 : 10;
+                }
+
                 gridHelper.position.x -= GAME_SPEED; if(gridHelper.position.x <= -10) gridHelper.position.x = 0;
             }
         };
@@ -513,6 +556,7 @@ export default function App() {
             start: (lvl, diff, heroId) => {
                 internalState = 'PLAYING'; activeDiff = diff; activeHero = heroId;
                 currentLevel = lvl; runScore = 0; combo = 0;
+                nextLevelThreshold = (lvl >= MAX_THEME_LEVEL) ? 20 : 10;
                 globalScore = (lvl <= MAX_THEME_LEVEL) ? lvl * 10 : 110 + (lvl - 11) * 20;
                 frames = 0; hitPauseTimer = 0; playerVelocityY = 0; screenShake = 0;
                 camera.fov = 60; camera.updateProjectionMatrix();
@@ -581,6 +625,13 @@ export default function App() {
                 newProfile.levelHighScores[currentDiff][lvl] = finalRun;
             }
             
+            // Save newly reached levels/checkpoints
+            let newUnlocked = [...(newProfile.unlockedLevels[currentDiff] || [0])];
+            for (let i = 0; i <= lvl; i++) {
+                if (!newUnlocked.includes(i)) newUnlocked.push(i);
+            }
+            newProfile.unlockedLevels[currentDiff] = newUnlocked;
+            
             saveProfile(newProfile);
             
             const gBest = Math.max(newProfile.highScores.easy, newProfile.highScores.medium, newProfile.highScores.hard);
@@ -593,11 +644,17 @@ export default function App() {
         }
     }, [gameState]);
 
+    // Sync 3D background theme when changing checkpoints in the menu
+    useEffect(() => {
+        if (engineLoaded && engineRef.current && gameState === 'START') {
+            engineRef.current.setTheme(selectedStartLevel);
+        }
+    }, [selectedStartLevel, engineLoaded, gameState]);
+
     // --- UI Render ---
     const startGame = () => {
-        const startLvl = Math.max(...(profile.unlockedLevels[currentDiff] || [0]));
         setGameState('PLAYING');
-        engineRef.current.start(startLvl, currentDiff, selectedHeroId);
+        engineRef.current.start(selectedStartLevel, currentDiff, selectedHeroId);
     };
 
     const confirmName = () => {
@@ -606,13 +663,12 @@ export default function App() {
         setGameState('START');
         if(engineRef.current) {
             engineRef.current.setHero(selectedHeroId);
-            engineRef.current.setTheme(Math.max(...(profile.unlockedLevels[currentDiff] || [0])));
+            engineRef.current.setTheme(selectedStartLevel);
         }
     };
 
     const globalBest = Math.max(profile.highScores.easy, profile.highScores.medium, profile.highScores.hard);
-    const startLvl = Math.max(...(profile.unlockedLevels[currentDiff] || [0]));
-    const themeName = THEMES[Math.min(startLvl, MAX_THEME_LEVEL)]?.name || 'City';
+    const themeName = THEMES[Math.min(selectedStartLevel, MAX_THEME_LEVEL)]?.name || 'City';
 
     return (
         <div className="fixed inset-0 overflow-hidden bg-[#050510] font-sans text-white select-none">
@@ -692,7 +748,12 @@ export default function App() {
                                     {['easy', 'medium', 'hard'].map(diff => (
                                         <button 
                                             key={diff}
-                                            onClick={() => { setCurrentDiff(diff); engineRef.current.setTheme(Math.max(...(profile.unlockedLevels[diff]||[0]))); }}
+                                            onClick={() => { 
+                                                setCurrentDiff(diff); 
+                                                const newLvl = Math.max(...(profile.unlockedLevels[diff]||[0]));
+                                                setSelectedStartLevel(newLvl);
+                                                if(engineRef.current) engineRef.current.setTheme(newLvl); 
+                                            }}
                                             className={`px-4 py-1.5 rounded-lg text-sm font-bold capitalize transition-all ${currentDiff === diff ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-400 shadow-[0_0_10px_rgba(0,255,255,0.3)]' : 'text-gray-500 border border-transparent hover:text-gray-300'}`}
                                         >
                                             {diff}
@@ -700,15 +761,24 @@ export default function App() {
                                     ))}
                                 </div>
 
-                                <div className="w-full bg-black/40 border border-cyan-500/20 rounded-xl p-4 flex items-center justify-between mb-6 shadow-inner">
-                                    <div className="text-left">
-                                        <div className="text-xs text-gray-400 uppercase tracking-wider font-bold mb-1">Current Sector</div>
-                                        <div className="text-xl font-black text-cyan-300 drop-shadow-md">{startLvl > MAX_THEME_LEVEL ? 'CHK' : 'LVL'} {startLvl}: {themeName}</div>
+                                <div className="w-full bg-black/40 border border-cyan-500/20 rounded-xl p-3 flex items-center justify-between mb-6 shadow-inner">
+                                    <button 
+                                        onClick={() => setSelectedStartLevel(Math.max(0, selectedStartLevel - 1))}
+                                        disabled={selectedStartLevel === 0}
+                                        className="text-2xl text-cyan-400 hover:text-white hover:scale-110 disabled:opacity-20 disabled:hover:scale-100 transition-all px-2"
+                                    >◀</button>
+                                    
+                                    <div className="text-center flex-1">
+                                        <div className="text-[10px] text-gray-400 uppercase tracking-widest font-bold mb-0.5">Deploy At</div>
+                                        <div className="text-xl font-black text-cyan-300 drop-shadow-md">{selectedStartLevel > MAX_THEME_LEVEL ? 'CHK' : 'LVL'} {selectedStartLevel}: {themeName}</div>
+                                        <div className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mt-1">Sector Best: <span className="text-yellow-400 text-xs">{profile.levelHighScores[currentDiff]?.[selectedStartLevel] || 0}</span></div>
                                     </div>
-                                    <div className="text-right">
-                                        <div className="text-xs text-gray-400 uppercase tracking-wider font-bold mb-1">Sector Best</div>
-                                        <div className="text-xl font-black text-yellow-400">{profile.levelHighScores[currentDiff]?.[startLvl] || 0}</div>
-                                    </div>
+
+                                    <button 
+                                        onClick={() => setSelectedStartLevel(selectedStartLevel + 1)}
+                                        disabled={!(profile.unlockedLevels[currentDiff] || [0]).includes(selectedStartLevel + 1)}
+                                        className="text-2xl text-cyan-400 hover:text-white hover:scale-110 disabled:opacity-20 disabled:hover:scale-100 transition-all px-2"
+                                    >▶</button>
                                 </div>
 
                                 <div className="w-full grid grid-cols-4 sm:grid-cols-4 gap-2 sm:gap-3 mb-6">
